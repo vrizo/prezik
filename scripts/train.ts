@@ -47,6 +47,7 @@ const USAGE = `Usage: npx tsx scripts/train.ts --site <url> [--base <url>] [--ru
   --signup    if set, requests credentials.mode "signup" with this email domain (default: mode "none")
   --email     with --password, requests credentials.mode "login" using these test credentials
   --password  with --email, the password for the test login (both are required together)
+  --format    "horizontal" (default) or "vertical" — video orientation
 
   --signup and --email/--password are mutually exclusive.`;
 
@@ -122,6 +123,7 @@ function parseArgs(argv: string[]): {
   runs: number;
   signupDomain?: string;
   login?: { email: string; password: string };
+  format: "horizontal" | "vertical";
 } {
   const flags: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
@@ -148,12 +150,18 @@ function parseArgs(argv: string[]): {
     throw new Error(`--signup and --email/--password are mutually exclusive\n\n${USAGE}`);
   }
 
+  const format = flags.format ?? "horizontal";
+  if (format !== "horizontal" && format !== "vertical") {
+    throw new Error(`--format must be "horizontal" or "vertical", got "${flags.format}"\n\n${USAGE}`);
+  }
+
   return {
     site: flags.site,
     base: (flags.base ?? DEFAULT_BASE).replace(/\/+$/, ""),
     runs,
     signupDomain: flags.signup,
     login,
+    format,
   };
 }
 
@@ -239,6 +247,7 @@ function runTool(cmd: string, args: string[]): string {
 function buildRunOptions(
   signupDomain: string | undefined,
   login: { email: string; password: string } | undefined,
+  format: "horizontal" | "vertical",
 ): RunOptions {
   const credentials: RunOptions["credentials"] = login
     ? { mode: "login", email: login.email, password: login.password }
@@ -250,6 +259,7 @@ function buildRunOptions(
     zoom: true,
     length: "short",
     captions: true,
+    format,
     credentials,
   };
 }
@@ -662,7 +672,7 @@ async function main(): Promise<void> {
       : "";
   log.info(`training loop: site=${argv.site} base=${argv.base} runs=${argv.runs}${credentialsTag}`);
 
-  const options = buildRunOptions(argv.signupDomain, argv.login);
+  const options = buildRunOptions(argv.signupDomain, argv.login, argv.format);
   const results: IterationResult[] = [];
 
   for (let i = 1; i <= argv.runs; i++) {

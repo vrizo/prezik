@@ -47,7 +47,7 @@ export interface RecordResult {
 // Fixed hold for the closing logo card, in ms.
 const END_CARD_MS = 2000;
 // Product link shown beneath the logo on the closing card.
-const END_CARD_LINK = "present.vrizo.net";
+const END_CARD_LINK = "prezik.vrizo.net";
 
 interface Segment {
   kind: "intro" | "scene" | "outro" | "endcard";
@@ -263,12 +263,16 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
   await gotoForScene(page, job.storyboard.targetUrl, job.emit);
   await dismissConsentBanner(page, job.log);
   if (job.credentials && job.credentials.mode !== "none") {
-    await performAuth(page, job.credentials, job.emit, job.log, { strict: true, agent: "presenter" });
+    const authed = await performAuth(page, job.credentials, job.emit, job.log, { strict: true, agent: "presenter" });
     await dismissConsentBanner(page, job.log); // the app may show its own banner after login
-    await job.emit.emit({
-      kind: "event",
-      event: { agent: "presenter", level: "info", message: "signed in before recording", url: page.url() },
-    });
+    if (authed) {
+      await job.emit.emit({
+        kind: "event",
+        event: { agent: "presenter", level: "info", message: "signed in before recording", url: page.url() },
+      });
+    }
+    // authed === null: the site has no sign-in form — credentials are optional,
+    // the storyboard was planned from public pages, record them as-is.
   }
 
   const segments: Segment[] = [];

@@ -5,8 +5,10 @@ import type { Credentials } from "./types.js";
 import { randomPassword, timestampId } from "./util.js";
 
 export interface AuthOpts {
-  // strict: throw on any failure (recording — the run must fail loudly).
-  // non-strict: emit an error event and return null so the public crawl carries on.
+  // strict: throw when a sign-in form was found but rejected the credentials
+  // (recording a wrong-password run must fail loudly). A site with NO sign-in
+  // form is never fatal for either caller: credentials are optional, so the
+  // demo simply proceeds with what is public.
   strict: boolean;
   agent: "mapper" | "presenter";
 }
@@ -75,10 +77,9 @@ export async function performAuth(
   if (noEmail || noPass) {
     const missing = [noEmail ? "email input" : "", noPass ? "password input" : ""].filter(Boolean).join(" and ");
     const core = `${mode}: ${navigated ? "" : "no auth link found; "}${missing} not found at ${page.url()}`;
-    if (opts.strict) throw new Error(core);
     const msg = `${core}; continuing with public pages`;
-    await emit.emit({ kind: "event", event: { agent: opts.agent, level: "error", message: msg, url: page.url() } });
-    log.error(msg);
+    await emit.emit({ kind: "event", event: { agent: opts.agent, level: "info", message: msg, url: page.url() } });
+    log.info(msg);
     return null;
   }
 
