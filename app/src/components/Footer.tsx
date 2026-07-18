@@ -14,7 +14,7 @@ export function Footer({ maxWidthClass = "max-w-[1120px]" }: { maxWidthClass?: s
               <img src={wordmark} alt="Prezik" className="h-9 w-auto invert" />
             </div>
             <p className="m-0 max-w-[280px] text-sm leading-[1.5] text-white/60">
-              Paste a link, get a narrated demo video. Built for builders shipping fast.
+              Paste a&nbsp;link, get a&nbsp;narrated demo video. Built for&nbsp;builders shipping fast.
             </p>
           </div>
           <div>
