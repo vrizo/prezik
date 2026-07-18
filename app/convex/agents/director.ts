@@ -72,7 +72,10 @@ export const run = internalAction({
         const { object } = await generateObject({
           model: openai("gpt-5.6-sol"),
           schema: directorDecisionModelSchema,
-          providerOptions: { openai: { reasoningEffort: "high" } },
+          // "medium" halves storyboard latency vs "high" (~107s → ~50s). The
+          // v6/v7 prompt rules carry the planning burden; if training scores
+          // drop, this is the first knob to turn back.
+          providerOptions: { openai: { reasoningEffort: "medium" } },
           prompt:
             directorPrompt({
               url: run.url,
@@ -145,7 +148,12 @@ export const run = internalAction({
           callbackUrl: `${siteUrl}/callbacks/runs/${runId}`,
           runToken,
           storyboard,
-          options: { voice: run.options.voice, zoom: run.options.zoom, captions: run.options.captions },
+          options: {
+            voice: run.options.voice,
+            zoom: run.options.zoom,
+            captions: run.options.captions,
+            format: run.options.format ?? "horizontal",
+          },
           credentials: recordCredentials,
         }),
       });

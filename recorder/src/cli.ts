@@ -8,11 +8,12 @@ import { runRecording } from "./record.js";
 import type { RecordOptions } from "./types.js";
 import { uploadToWorker } from "./upload.js";
 
-// tsx src/cli.ts --storyboard <file> --out <dir> [--no-tts] [--no-upload]
+// tsx src/cli.ts --storyboard <file> --out <dir> [--no-tts] [--no-upload] [--vertical]
 function parseArgs(argv: string[]) {
-  const args: { storyboard?: string; out?: string; noTts: boolean; noUpload: boolean } = {
+  const args: { storyboard?: string; out?: string; noTts: boolean; noUpload: boolean; vertical: boolean } = {
     noTts: false,
     noUpload: false,
+    vertical: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -20,11 +21,12 @@ function parseArgs(argv: string[]) {
     else if (a === "--out") args.out = argv[++i];
     else if (a === "--no-tts") args.noTts = true;
     else if (a === "--no-upload") args.noUpload = true;
+    else if (a === "--vertical") args.vertical = true;
     else throw new Error(`unknown argument: ${a}`);
   }
   if (!args.storyboard) throw new Error("--storyboard <file> is required");
   if (!args.out) throw new Error("--out <dir> is required");
-  return args as { storyboard: string; out: string; noTts: boolean; noUpload: boolean };
+  return args as { storyboard: string; out: string; noTts: boolean; noUpload: boolean; vertical: boolean };
 }
 
 // The CLI is a local harness: callbacks are logged, not posted.
@@ -44,7 +46,12 @@ async function main(): Promise<void> {
   const log = makeLogger();
 
   const storyboard = Storyboard.parse(JSON.parse(readFileSync(resolve(args.storyboard), "utf8")));
-  const options: RecordOptions = { voice: "neutral", zoom: true, captions: true };
+  const options: RecordOptions = {
+    voice: "neutral",
+    zoom: true,
+    captions: true,
+    format: args.vertical ? "vertical" : "horizontal",
+  };
   const outDir = resolve(args.out);
 
   if (args.noTts) {

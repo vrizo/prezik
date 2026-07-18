@@ -1,5 +1,10 @@
 import { v } from "convex/values";
 
+// Server-side cap on free-form user guidance (options.guidance). Mirrored in
+// app/src/features/start/InstructionsField.tsx's INSTRUCTIONS_MAX for the
+// textarea — keep both in sync by hand.
+export const GUIDANCE_MAX_LENGTH = 2000;
+
 // Convex `v` validators mirroring the zod schemas in shared/src/storyboard.ts
 // and shared/src/events.ts. Convex tables can't consume zod directly, so the
 // shape is hand-mirrored here. Keep in sync with shared/src by hand whenever
@@ -16,6 +21,7 @@ export const runOptionsValidator = v.object({
   zoom: v.boolean(),
   length: v.union(v.literal("short"), v.literal("medium"), v.literal("long")),
   captions: v.boolean(),
+  format: v.optional(v.union(v.literal("horizontal"), v.literal("vertical"))),
   guidance: v.optional(v.string()),
   credentials: credentialsValidator,
 });

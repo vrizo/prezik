@@ -5,12 +5,12 @@ import { esbuildHelperInitScript } from "./browser.js";
 import type { Emitter } from "./callbacks.js";
 import { attachBrowserTelemetry } from "./diag.js";
 import type { Logger } from "./log.js";
-import type { MapRequest } from "./types.js";
+import { viewportFor, type MapRequest } from "./types.js";
 
-// Contract cap is 12 pages; MAP_MAX_PAGES is an explicit override (e.g. to keep
-// a crawl short and polite when testing) and never exceeds 12.
-const MAX_PAGES = Math.min(12, Number(process.env.MAP_MAX_PAGES) || 12);
-const MAX_MS = 3 * 60 * 1000;
+// Contract cap is 20 pages; MAP_MAX_PAGES is an explicit override (e.g. to keep
+// a crawl short and polite when testing) and never exceeds 20.
+const MAX_PAGES = Math.min(20, Number(process.env.MAP_MAX_PAGES) || 20);
+const MAX_MS = 4 * 60 * 1000;
 // docs/legal pages are near-useless for a product demo; a small sample is enough
 // for the planner, so at most this many low-priority pages are mapped per run.
 const MAX_LOW_PRIORITY = 2;
@@ -120,11 +120,24 @@ async function extractInfo(page: Page): Promise<PageInfo> {
       return (aria || text || placeholder || name || "").slice(0, 60);
     };
 
-    // Priority order = prominence: nav links, buttons/CTAs, inputs, headings,
-    // remaining content links.
-    const groups: { sel: string; kind: "link" | "button" | "input" | "heading" | "other" }[] = [
+    // Custom controls (rating scales, styled radios/checkboxes) hide the real
+    // input and show a clickable <label for=...> instead. The hidden input
+    // fails the visibility check and the label matches no other group, so
+    // without this the control is invisible to the Director. Clicking the
+    // label toggles the input, so it is harvested as a button.
+    const isProxyLabel = (el: Element): boolean => {
+      const forId = el.getAttribute("for");
+      if (!forId) return false;
+      const input = document.getElementById(forId);
+      return !!input && input.matches("input, select, textarea") && !visible(input);
+    };
+
+    // Priority order = prominence: nav links, buttons/CTAs, labels standing in
+    // for hidden inputs, inputs, headings, remaining content links.
+    const groups: { sel: string; kind: "link" | "button" | "input" | "heading" | "other"; accept?: (el: Element) => boolean }[] = [
       { sel: "nav a[href], header a[href]", kind: "link" },
       { sel: 'button, [role="button"], a[class*="btn" i], a[class*="button" i], input[type="submit"]', kind: "button" },
+      { sel: "label[for]", kind: "button", accept: isProxyLabel },
       { sel: 'input:not([type="hidden"]):not([type="submit"]), textarea, select', kind: "input" },
       { sel: "h1, h2, h3", kind: "heading" },
       { sel: "main a[href], article a[href], section a[href]", kind: "link" },
@@ -137,6 +150,7 @@ async function extractInfo(page: Page): Promise<PageInfo> {
       for (const el of Array.from(document.querySelectorAll(g.sel))) {
         if (elements.length >= 20) break;
         if (taken.has(el) || !visible(el)) continue;
+        if (g.accept && !g.accept(el)) continue;
         const label = labelFor(el);
         if (!label) continue;
         const selector = selectorFor(el);
@@ -200,7 +214,7 @@ export async function runMap(req: MapRequest, emit: Emitter, log: Logger): Promi
   // Same viewport as recording (record.ts): selectors are harvested from this
   // exact layout, and responsive pages restructure their DOM across widths —
   // a mismatch makes harvested selectors dangle at record time.
-  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const context = await browser.newContext({ viewport: viewportFor(req.format), deviceScaleFactor: 1.5 });
   await context.addInitScript(esbuildHelperInitScript());
   const page = await context.newPage();
   const telemetry = attachBrowserTelemetry(page, log);

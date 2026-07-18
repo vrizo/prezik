@@ -4,7 +4,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { agentNameValidator, runOptionsValidator } from "./lib/validators";
+import { agentNameValidator, GUIDANCE_MAX_LENGTH, runOptionsValidator } from "./lib/validators";
 import { randomToken, sha256Hex } from "./lib/crypto";
 import { appendEventDb } from "./lib/events";
 
@@ -22,6 +22,9 @@ async function startRun(
   if (!session) throw new ConvexError("session not found");
   if (session.credits < 1) {
     throw new ConvexError("not enough credits — redeem a coupon or add credits before starting a run");
+  }
+  if ((args.options.guidance?.length ?? 0) > GUIDANCE_MAX_LENGTH) {
+    throw new ConvexError(`guidance must be ${GUIDANCE_MAX_LENGTH} characters or fewer`);
   }
 
   const runToken = randomToken(32);
@@ -42,6 +45,7 @@ async function startRun(
     runToken,
     url: args.url,
     credentials: args.options.credentials,
+    format: args.options.format ?? "horizontal",
   });
 
   return { runId, runToken };
@@ -109,6 +113,9 @@ export const setGuidance = mutation({
   args: { runId: v.id("runs"), guidance: v.string() },
   returns: v.null(),
   handler: async (ctx, { runId, guidance }) => {
+    if (guidance.length > GUIDANCE_MAX_LENGTH) {
+      throw new ConvexError(`guidance must be ${GUIDANCE_MAX_LENGTH} characters or fewer`);
+    }
     await ctx.db.patch(runId, { guidance });
     return null;
   },

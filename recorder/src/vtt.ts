@@ -25,27 +25,52 @@ export function formatTimestamp(ms: number): string {
   return `${pad(h)}:${pad(m)}:${pad(s)}.${pad(millis, 3)}`;
 }
 
+export interface Cue {
+  startMs: number;
+  endMs: number;
+  text: string;
+}
+
 // One cue per sentence when a segment has several (time split proportional to
 // sentence length), otherwise one cue for the whole segment.
-export function buildVtt(segments: VttSegment[]): string {
-  const lines: string[] = ["WEBVTT", ""];
+export function buildCues(segments: VttSegment[]): Cue[] {
+  const cues: Cue[] = [];
   for (const seg of segments) {
     const narration = seg.narration.trim();
     if (!narration) continue;
     const sentences = splitSentences(narration);
     if (sentences.length <= 1) {
-      lines.push(`${formatTimestamp(seg.startMs)} --> ${formatTimestamp(seg.startMs + seg.audioMs)}`);
-      lines.push(narration, "");
+      cues.push({ startMs: seg.startMs, endMs: seg.startMs + seg.audioMs, text: narration });
       continue;
     }
     const totalChars = sentences.reduce((a, s) => a + s.length, 0) || 1;
     let t = seg.startMs;
     for (const sentence of sentences) {
       const dur = Math.round(seg.audioMs * (sentence.length / totalChars));
-      lines.push(`${formatTimestamp(t)} --> ${formatTimestamp(t + dur)}`);
-      lines.push(sentence, "");
+      cues.push({ startMs: t, endMs: t + dur, text: sentence });
       t += dur;
     }
   }
+  return cues;
+}
+
+export function buildVtt(segments: VttSegment[]): string {
+  const lines: string[] = ["WEBVTT", ""];
+  for (const cue of buildCues(segments)) {
+    lines.push(`${formatTimestamp(cue.startMs)} --> ${formatTimestamp(cue.endMs)}`);
+    lines.push(cue.text, "");
+  }
+  return lines.join("\n");
+}
+
+// SubRip file for ffmpeg's subtitles filter (burn-in). Same cues as the VTT,
+// with SRT's comma millisecond separator and 1-based cue numbering.
+export function buildSrt(segments: VttSegment[]): string {
+  const lines: string[] = [];
+  buildCues(segments).forEach((cue, i) => {
+    lines.push(String(i + 1));
+    lines.push(`${formatTimestamp(cue.startMs).replace(".", ",")} --> ${formatTimestamp(cue.endMs).replace(".", ",")}`);
+    lines.push(cue.text, "");
+  });
   return lines.join("\n");
 }

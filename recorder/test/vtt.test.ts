@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildVtt, formatTimestamp, splitSentences } from "../src/vtt.js";
+import { buildSrt, buildVtt, formatTimestamp, splitSentences } from "../src/vtt.js";
 
 describe("formatTimestamp", () => {
   it("formats milliseconds as HH:MM:SS.mmm", () => {
@@ -43,5 +43,22 @@ describe("buildVtt", () => {
 
   it("skips empty narration", () => {
     expect(buildVtt([{ startMs: 0, audioMs: 1000, narration: "   " }])).toBe("WEBVTT\n");
+  });
+});
+
+describe("buildSrt", () => {
+  it("numbers cues and uses comma millisecond separators", () => {
+    const srt = buildSrt([{ startMs: 2000, audioMs: 4000, narration: "Aaaa. Bbbb." }]);
+    const lines = srt.split("\n");
+    expect(lines[0]).toBe("1");
+    expect(lines[1]).toBe("00:00:02,000 --> 00:00:04,000");
+    expect(lines[2]).toBe("Aaaa.");
+    expect(lines[4]).toBe("2");
+    expect(lines[5]).toBe("00:00:04,000 --> 00:00:06,000");
+    expect(lines[6]).toBe("Bbbb.");
+  });
+
+  it("is empty for empty narration", () => {
+    expect(buildSrt([{ startMs: 0, audioMs: 1000, narration: "   " }])).toBe("");
   });
 });

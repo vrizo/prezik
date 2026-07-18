@@ -17,6 +17,7 @@ export const run = internalAction({
     runToken: v.string(),
     url: v.string(),
     credentials: credentialsValidator,
+    format: v.union(v.literal("horizontal"), v.literal("vertical")),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -57,6 +58,7 @@ export const run = internalAction({
           runToken: args.runToken,
           url: args.url,
           credentials: args.credentials,
+          format: args.format,
         }),
       });
       if (!res.ok) throw new Error(`recorder /map failed: ${res.status} ${await res.text()}`);

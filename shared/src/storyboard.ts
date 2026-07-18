@@ -49,6 +49,10 @@ export const RunOptions = z.object({
   zoom: z.boolean(), // on by default in UI
   length: z.enum(["short", "medium", "long"]), // short default in UI
   captions: z.boolean(), // on by default in UI
+  // Video orientation: horizontal 16:9 (default) or vertical 9:16. Optional in
+  // the stored shape because runs created before the field existed lack it;
+  // consumers treat absence as "horizontal".
+  format: z.enum(["horizontal", "vertical"]).optional(),
   guidance: z.string().optional(),
   credentials: z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("none") }),

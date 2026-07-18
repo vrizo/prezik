@@ -19,7 +19,12 @@ export interface CapturedFrames {
   endMs: number; // epoch ms when capture stopped
 }
 
-export async function startScreencast(page: Page, framesDir: string, log: Logger): Promise<Screencast> {
+export async function startScreencast(
+  page: Page,
+  framesDir: string,
+  log: Logger,
+  maxSize: { width: number; height: number },
+): Promise<Screencast> {
   const cdp: CDPSession = await page.context().newCDPSession(page);
   const files: string[] = [];
   const timestampsMs: number[] = [];
@@ -48,8 +53,8 @@ export async function startScreencast(page: Page, framesDir: string, log: Logger
   await cdp.send("Page.startScreencast", {
     format: "jpeg",
     quality: 80,
-    maxWidth: 1920,
-    maxHeight: 1080,
+    maxWidth: maxSize.width,
+    maxHeight: maxSize.height,
     everyNthFrame: 1,
   });
 

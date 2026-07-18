@@ -33,7 +33,10 @@
       "name": "prezik-app-production",
       "routes": [{ "pattern": "app.present.vrizo.net", "custom_domain": true }],
       "vars": {
-        "CONVEX_HTTP_ACTIONS_URL": "https://polished-chicken-876.eu-west-1.convex.site"
+        // Production has its own Convex deployment (fabulous-bird-522), kept
+        // fully separate from the staging backend (polished-chicken-876) so
+        // ongoing staging development can't affect production.
+        "CONVEX_HTTP_ACTIONS_URL": "https://fabulous-bird-522.eu-west-1.convex.site"
       }
     }
   }

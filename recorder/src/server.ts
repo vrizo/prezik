@@ -1,4 +1,6 @@
 import http from "node:http";
+import { statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { httpEmitter } from "./callbacks.js";
 import { containerDiagnostics } from "./diag.js";
@@ -11,6 +13,10 @@ import { uploadToWorker } from "./upload.js";
 
 const log = makeLogger();
 const PORT = Number(process.env.PORT || 8080);
+
+function buildStamp(): string {
+  return statSync(fileURLToPath(import.meta.url)).mtime.toISOString();
+}
 
 function send(res: http.ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
@@ -78,7 +84,10 @@ const server = http.createServer(async (req, res) => {
   const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
 
   if (req.method === "GET" && pathname === "/healthz") {
-    send(res, 200, { ok: true });
+    // build = mtime of this compiled file inside the image, i.e. when the
+    // image was built. Lets deploy scripts probe whether a container instance
+    // is already on the new image instead of blind-waiting for the rollout.
+    send(res, 200, { ok: true, build: buildStamp() });
     return;
   }
 

@@ -20,6 +20,20 @@ const zoomStates = new WeakMap<Page, ZoomState>();
 // Pages whose framenavigated listener has already been attached.
 const hookedPages = new WeakSet<Page>();
 
+// Epoch ms when the currently shown highlight has fully faded out. Used so the
+// recorder never navigates away or ends the take mid-animation.
+const highlightEndAt = new WeakMap<Page, number>();
+
+// Wait until the last highlight's fade-out has completed (no-op when none is
+// active or it already finished). Call before a goto or before ending a scene.
+export async function waitForHighlightSettled(page: Page): Promise<void> {
+  const end = highlightEndAt.get(page);
+  if (!end) return;
+  const wait = end - Date.now();
+  if (wait > 0) await page.waitForTimeout(wait);
+  highlightEndAt.delete(page);
+}
+
 // A goto lands on a fresh document with no transform (and the page-side saved
 // styles are gone with it), so drop any Node-side zoom state on main-frame
 // navigation. Attached lazily, exactly once per page. Explicit — no silent
@@ -28,7 +42,10 @@ function ensurePageHooks(page: Page): void {
   if (hookedPages.has(page)) return;
   hookedPages.add(page);
   page.on("framenavigated", (frame) => {
-    if (frame === page.mainFrame()) zoomStates.delete(page);
+    if (frame === page.mainFrame()) {
+      zoomStates.delete(page);
+      highlightEndAt.delete(page); // the overlay died with the old document
+    }
   });
 }
 
@@ -154,8 +171,9 @@ export async function highlightSelector(page: Page, selector: string): Promise<v
         border: borderPx,
       };
 
-  const fadeMs = 300;
-  const holdMs = 1500;
+  const fadeMs = 180;
+  const holdMs = 1100;
+  highlightEndAt.set(page, Date.now() + fadeMs + holdMs + fadeMs + 80);
   await page.evaluate((b) => {
     document.querySelectorAll(".__prezik_highlight__").forEach((n) => n.remove());
     const d = document.createElement("div");
@@ -277,8 +295,8 @@ export function titleCardHtml(productName: string, tagline: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><style>
   html,body{margin:0;height:100%;}
   body{background:#FAF6EF;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#3B3A36;}
-  .name{font-size:104px;font-weight:800;letter-spacing:-2px;margin:0 48px;text-align:center;line-height:1.05;}
-  .tag{font-size:40px;font-weight:400;color:#6B675E;margin-top:28px;text-align:center;max-width:1400px;padding:0 48px;}
+  .name{font-size:min(104px,10vw);font-weight:800;letter-spacing:-2px;margin:0 48px;text-align:center;line-height:1.05;}
+  .tag{font-size:min(40px,4.5vw);font-weight:400;color:#6B675E;margin-top:28px;text-align:center;max-width:1400px;padding:0 48px;}
   </style></head><body><div class="name">${esc(productName)}</div><div class="tag">${esc(tagline)}</div></body></html>`;
 }
 
@@ -290,7 +308,7 @@ export function endCardHtml(link: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><style>
   html,body{margin:0;height:100%;}
   body{background:#FFFFFF;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}
-  img{width:300px;height:auto;display:block;}
-  .link{margin-top:28px;font-size:34px;font-weight:500;color:#3B3A36;letter-spacing:-0.5px;}
+  img{width:min(300px,42vw);height:auto;display:block;}
+  .link{margin-top:28px;font-size:min(34px,4.2vw);font-weight:500;color:#3B3A36;letter-spacing:-0.5px;}
   </style></head><body><img src="${PREZIK_LOGO_DATA_URI}" alt="Prezik"><div class="link">${esc(link)}</div></body></html>`;
 }

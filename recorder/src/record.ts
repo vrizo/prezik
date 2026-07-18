@@ -8,11 +8,11 @@ import { dismissConsentBanner, performAuth } from "./auth.js";
 import type { Emitter } from "./callbacks.js";
 import { attachBrowserTelemetry } from "./diag.js";
 import type { Logger } from "./log.js";
-import type { Credentials, RecordOptions } from "./types.js";
+import { outputSizeFor, viewportFor, type Credentials, type RecordOptions } from "./types.js";
 import { synthesizeSpeech } from "./tts.js";
 import { assembleAndMux, probeDurationMs, type AudioPlacement } from "./ffmpeg.js";
 import { buildConcat, compressSilence, startScreencast, MAX_SILENCE_GAP_MS } from "./screencast.js";
-import { buildVtt, type VttSegment } from "./vtt.js";
+import { buildSrt, buildVtt, type VttSegment } from "./vtt.js";
 import { beatStartOffsets, remainingWaitMs, SILENT_SEGMENT_MS } from "./timing.js";
 import {
   cursorInitScript,
@@ -21,6 +21,7 @@ import {
   highlightSelector,
   moveCursorToSelector,
   titleCardHtml,
+  waitForHighlightSettled,
   zoomOut,
   zoomToSelector,
 } from "./browser.js";
@@ -153,6 +154,8 @@ async function runAction(page: Page, action: SceneAction, creds: ResolvedCreds, 
   };
   switch (action.type) {
     case "goto":
+      // Never cut away while a highlight is still animating on the old page.
+      await waitForHighlightSettled(page);
       await gotoForScene(page, action.url, emit);
       await page.waitForTimeout(600);
       return;
@@ -234,8 +237,19 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
 
   // --disable-dev-shm-usage: Playwright passes it by default today; pinned here
   // so the container never depends on that default (64MB /dev/shm in prod).
-  const browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage"] });
-  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  // CSS layout at deviceScaleFactor 1.5: pages lay out at the format's CSS
+  // viewport (1280x720 horizontal, 720x1280 vertical) while Chrome renders at
+  // 1.5x device pixels, so screencast frames stay native full HD.
+  // --force-device-scale-factor is required on top of the context option: the
+  // CDP screencast emits frames in DIPs unless the headless compositor itself
+  // runs at 1.5 — verified empirically against both knobs.
+  const viewport = viewportFor(job.options.format);
+  const outputSize = outputSizeFor(job.options.format);
+  const browser = await chromium.launch({
+    headless: true,
+    args: ["--disable-dev-shm-usage", "--force-device-scale-factor=1.5"],
+  });
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1.5 });
   await context.addInitScript(esbuildHelperInitScript());
   await context.addInitScript(cursorInitScript());
   const page = await context.newPage();
@@ -282,7 +296,7 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
 
   let frames;
   try {
-    const screencast = await startScreencast(page, framesDir, job.log);
+    const screencast = await startScreencast(page, framesDir, job.log, outputSize);
     try {
       // Intro title card.
       await runSegment("intro", "intro", job.storyboard.intro.narration, async () => {
@@ -319,10 +333,17 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
         job.log.info(`scene done: ${scene.id}`);
       }
 
-      // Outro title card.
-      await runSegment("outro", "outro", job.storyboard.outro.narration, async () => {
-        await page.setContent(titleCardHtml(job.storyboard.productName, job.storyboard.tagline), { waitUntil: "load" });
-      });
+      // Outro title card. The pre-body wait keeps the last scene's highlight
+      // fade-out on camera instead of cutting to the card mid-animation.
+      await runSegment(
+        "outro",
+        "outro",
+        job.storyboard.outro.narration,
+        async () => {
+          await page.setContent(titleCardHtml(job.storyboard.productName, job.storyboard.tagline), { waitUntil: "load" });
+        },
+        () => waitForHighlightSettled(page),
+      );
 
       // Closing logo card: the Prezik logo + product link on white, held a fixed
       // 2s. Silent (no narration/audio), so it runs outside runSegment. Pushed as
@@ -384,8 +405,19 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
     .filter((x): x is { s: Segment & { audioPath: string }; i: number } => x.s.audioPath !== null)
     .map(({ s, i }) => ({ path: s.audioPath, offsetMs: offsetOf(s, i) }));
 
+  // Captions are burned into the video (SRT via ffmpeg's subtitles filter) and
+  // also emitted as a sidecar WebVTT for the in-app <track> element.
+  let captionsVtt: string | undefined;
+  let srtPath: string | undefined;
+  if (job.options.captions) {
+    const vttSegments: VttSegment[] = segments.map((s, i) => ({ startMs: offsetOf(s, i), audioMs: s.audioMs, narration: s.narration }));
+    captionsVtt = buildVtt(vttSegments);
+    srtPath = join(framesDir, "captions.srt");
+    writeFileSync(srtPath, buildSrt(vttSegments));
+  }
+
   const mp4Path = join(job.outDir, `${job.runId}.mp4`);
-  await assembleAndMux(concatPath, placements, mp4Path, job.log);
+  await assembleAndMux(concatPath, placements, mp4Path, job.log, srtPath, outputSize);
   const durationSec = Math.round((await probeDurationMs(mp4Path)) / 1000);
 
   // Frames and narration clips are only inputs to the finished mp4. Delete them
@@ -393,12 +425,6 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
   rmSync(framesDir, { recursive: true, force: true });
   for (const s of segments) if (s.audioPath) rmSync(s.audioPath, { force: true });
   job.log.info(`cleaned ${frames.files.length} frame files + ${placements.length} audio clip(s)`);
-
-  let captionsVtt: string | undefined;
-  if (job.options.captions) {
-    const vttSegments: VttSegment[] = segments.map((s, i) => ({ startMs: offsetOf(s, i), audioMs: s.audioMs, narration: s.narration }));
-    captionsVtt = buildVtt(vttSegments);
-  }
 
   return { mp4Path, durationSec, captionsVtt };
 }
@@ -442,8 +468,35 @@ async function runScene(
       await runAction(page, action, creds, emit, log);
     } catch (e) {
       const sel = "selector" in action ? action.selector : "url" in action ? action.url : action.type;
-      log.error(`action ${action.type} failed [${sel}] in scene ${scene.id}`, String(e));
-      throw e; // fail loudly; the job wrapper reports recorderFailed
+      // One broken action (e.g. a button the app keeps disabled) must not kill
+      // the whole recording. The rest of THIS scene is skipped — later actions
+      // may depend on the failed one — and the failure is reported as an error
+      // event so it is visible in the run feed, then recording moves on to the
+      // next scene. Navigation and auth failures outside runScene still fail
+      // the run loudly.
+      log.error(`action ${action.type} failed [${sel}] in scene ${scene.id}, skipping rest of scene`, String(e));
+      await emit.emit({
+        kind: "event",
+        event: {
+          agent: "presenter",
+          level: "error",
+          message: `scene ${scene.id}: ${action.type} on ${sel} failed (${firstLine(e)}) — remaining actions skipped, video continues`,
+          sceneId: scene.id,
+        },
+      });
+      // Do not leave a stale zoom behind for a following scene that has no goto.
+      if (zoomEnabled) await zoomOut(page, log).catch(() => log.info("zoomOut after failed action did not apply"));
+      return;
     }
   }
+  // Let the last highlight finish its fade-out before the scene can end — the
+  // narration tail usually covers this, but actions that ran long must not
+  // leave a half-faded frame as the cut point.
+  await waitForHighlightSettled(page);
+}
+
+// First line of a Playwright error — the full message includes a multi-line
+// call log that would bloat the run feed.
+function firstLine(e: unknown): string {
+  return String(e instanceof Error ? e.message : e).split("\n")[0];
 }
