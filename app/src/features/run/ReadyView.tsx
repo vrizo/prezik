@@ -69,7 +69,7 @@ export function ReadyView({ run, onRerecord }: Props) {
               </div>
             ) : (
               <p className="rounded-[20px] border border-dashed border-line2 p-4 text-sm text-sub">
-                The run finished but no playback URL was recorded — this should not happen; re-record
+                The&nbsp;run finished but no playback URL was recorded — this should not happen; re-record
                 below.
               </p>
             )}

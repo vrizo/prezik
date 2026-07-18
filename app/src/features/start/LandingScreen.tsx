@@ -11,11 +11,11 @@ const FEATURES = [
   },
   {
     title: "Story & narration",
-    body: "AI writes the storyboard and speaks a natural voiceover.",
+    body: "AI writes the\u00A0storyboard and speaks a\u00A0natural voiceover.",
   },
   {
     title: "Cinematic capture",
-    body: "Visible cursor, highlights, and smooth zooms — recorded in 60–90s.",
+    body: "Visible cursor, highlights, and smooth zooms — recorded in\u00A060–90s.",
   },
 ];
 
@@ -61,12 +61,12 @@ export function LandingScreen({ navigate }: Props) {
 
         <div className="grid grid-cols-1 items-center gap-[30px] px-[30px] pb-[34px] pt-4 lg:grid-cols-[1.05fr_.95fr]">
           <div>
-            <h1 className="m-0 text-[40px] font-bold leading-[1.05] tracking-[-0.04em] sm:text-[48px] lg:text-[56px] lg:leading-[1.02]">
-              {"Turn any link into a narrated demo"}
+            <h1 className="m-0 text-[30px] font-bold leading-[1.08] tracking-[-0.04em] sm:text-[48px] sm:leading-[1.05] lg:text-[56px] lg:leading-[1.02]">
+              {"Turn any link into\u00A0a\u00A0narrated demo"}
             </h1>
             <p className="mt-5 max-w-[460px] text-lg leading-[1.5] text-sub">
-              Paste a URL. Prezik explores your app, plans the story, and records a narrated walkthrough — visible
-              cursor, highlights, smooth zooms.
+              Paste a&nbsp;URL. Prezik explores your app, plans the&nbsp;story, and records a&nbsp;narrated walkthrough —
+              visible cursor, highlights, smooth zooms.
             </p>
             <form onSubmit={handleSubmit} className="mt-[26px] flex max-w-[520px] flex-col gap-2.5 sm:flex-row">
               <input
@@ -75,7 +75,7 @@ export function LandingScreen({ navigate }: Props) {
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://your-app.com"
                 aria-label="Your app's URL"
-                className="h-14 flex-1 rounded-full border border-ink bg-white px-5 text-base text-ink outline-none"
+                className="h-14 w-full rounded-full border border-ink bg-white px-5 text-base text-ink outline-none sm:flex-1"
               />
               <button
                 type="submit"
@@ -86,27 +86,27 @@ export function LandingScreen({ navigate }: Props) {
             </form>
             {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             <div className="mt-[18px] text-[13px] text-faint">
-              Pay per run, no subscription
+              Pay per&nbsp;run, no subscription
             </div>
           </div>
 
-          <div className="relative grid h-[300px] place-items-center sm:h-[440px]">
+          <div className="relative order-first grid h-[180px] place-items-center sm:h-[440px] lg:order-none">
             <Orb
               theme="purple"
-              className="anim-floaty absolute left-[2%] top-[14%] h-[90px] w-[90px] opacity-90 sm:h-[120px] sm:w-[120px]"
+              className="anim-floaty absolute left-[2%] top-[14%] h-[56px] w-[56px] opacity-90 sm:h-[120px] sm:w-[120px]"
             />
             <Orb
               theme="blue"
-              className="anim-floaty absolute bottom-[12%] right-[4%] h-[100px] w-[100px] opacity-[.92] [animation-delay:-2s] sm:h-[140px] sm:w-[140px]"
+              className="anim-floaty absolute bottom-[12%] right-[4%] h-[62px] w-[62px] opacity-[.92] [animation-delay:-2s] sm:h-[140px] sm:w-[140px]"
             />
             <Orb
               theme="mono"
-              className="anim-floaty absolute right-[16%] top-[2%] h-[56px] w-[56px] opacity-80 [animation-delay:-4s] sm:h-[74px] sm:w-[74px]"
+              className="anim-floaty absolute right-[16%] top-[2%] h-[36px] w-[36px] opacity-80 [animation-delay:-4s] sm:h-[74px] sm:w-[74px]"
             />
             <Orb
               theme="orange"
               play
-              className="relative h-[200px] w-[200px] drop-shadow-[0_20px_50px_rgba(198,42,6,.28)] sm:h-[280px] sm:w-[280px]"
+              className="relative h-[128px] w-[128px] drop-shadow-[0_20px_50px_rgba(198,42,6,.28)] sm:h-[280px] sm:w-[280px]"
             />
           </div>
         </div>
@@ -115,28 +115,30 @@ export function LandingScreen({ navigate }: Props) {
       <div>
         <div className="text-[13px] font-semibold uppercase tracking-wide text-faint">How it works</div>
         <h2 className="mt-1.5 text-[28px] font-bold tracking-[-0.03em] sm:text-[34px]">
-          From link to video, hands-off
+          From link to&nbsp;video, hands-off
         </h2>
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {FEATURES.map((feature) => (
             <div key={feature.title} className="rounded-[20px] border border-line bg-bg p-6">
-              <div
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ background: "linear-gradient(135deg,#ff9c52,#c62a06)" }}
-              />
-              <div className="mt-3 font-semibold text-ink">{feature.title}</div>
-              <p className="mt-1.5 text-[15px] leading-[1.5] text-sub">{feature.body}</p>
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ background: "linear-gradient(135deg,#ff9c52,#c62a06)" }}
+                />
+                <div className="font-semibold text-ink">{feature.title}</div>
+              </div>
+              <p className="mt-2 text-[15px] leading-[1.5] text-sub">{feature.body}</p>
             </div>
           ))}
         </div>
       </div>
 
       <div className="rounded-[30px] bg-ink p-8 text-white sm:p-10">
-        <div className="text-[13px] font-semibold uppercase tracking-wide text-white/60">For builders</div>
+        <div className="text-[13px] font-semibold uppercase tracking-wide text-white/60">For&nbsp;builders</div>
         <h2 className="mt-1.5 text-[28px] font-bold tracking-[-0.03em] sm:text-[34px]">Full API & MCP access</h2>
         <p className="mt-3 max-w-[520px] text-[15px] leading-[1.5] text-white/70">
-          Drive Prezik from your coding agent over MCP or plain HTTP. Regenerate your demo automatically after every
-          deploy.
+          Drive Prezik from&nbsp;your coding agent over&nbsp;MCP or plain HTTP. Regenerate your demo automatically after
+          every deploy.
         </p>
         <a
           href="https://github.com/vrizo/prezik/tree/main/docs/api"
@@ -144,7 +146,7 @@ export function LandingScreen({ navigate }: Props) {
           rel="noopener noreferrer"
           className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-[15px] font-semibold text-ink hover:bg-white/90"
         >
-          Read the docs
+          Read the&nbsp;docs
           <span aria-hidden>→</span>
         </a>
       </div>
@@ -156,14 +158,14 @@ export function LandingScreen({ navigate }: Props) {
             <img src={techEuropeLogo} alt="" className="h-8 w-8 rounded-[6px]" />
             <div>
               <div className="text-[13px] font-semibold uppercase tracking-wide text-white/80">
-                Sponsored by {"{Tech: Europe}"}
+                Sponsored by&nbsp;{"{Tech: Europe}"}
               </div>
               <p className="mt-1 text-[17px] font-semibold leading-[1.4] sm:text-lg">
                 Use code{" "}
                 <code className="rounded-full bg-white/20 px-3 py-1 font-mono font-semibold tracking-wide">
-                  TECH-EUROPE-HACKATHON
+                  tech-europe-hackathon
                 </code>{" "}
-                for one free generation.
+                for&nbsp;one free generation.
               </p>
             </div>
           </div>

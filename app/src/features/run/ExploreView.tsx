@@ -72,7 +72,7 @@ export function ExploreView({ run, sitePages, events, live, stepper }: Props) {
       <div className="mb-3 mt-[26px] flex items-center justify-between">
         <span className="text-[13px] font-bold">Discovered pages</span>
         <span className="text-[12px] text-faint">
-          {live ? `${read} of ~${estimate} pages` : `${read} pages`}
+          {live ? `${read} of\u00A0~${estimate} pages` : `${read} pages`}
         </span>
       </div>
 
@@ -122,7 +122,7 @@ export function ExploreView({ run, sitePages, events, live, stepper }: Props) {
         )}
 
         {live && read === 0 && !inProgress && (
-          <div className="px-[18px] py-[16px] text-[13px] text-faint">starting the crawl…</div>
+          <div className="px-[18px] py-[16px] text-[13px] text-faint">starting the&nbsp;crawl…</div>
         )}
       </div>
     </>

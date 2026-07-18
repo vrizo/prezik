@@ -37,13 +37,13 @@ export function PlanView({ storyboard, live, stepper }: Props) {
         <div className="flex-1">
           <div className="flex items-center gap-[10px]">
             <h2 className="whitespace-nowrap text-[26px] font-bold tracking-[-0.025em]">
-              Planning the demo
+              Planning the&nbsp;demo
             </h2>
             {live && <SpinnerArc size={20} strokeColor="#605c55" className="relative top-[1px]" />}
           </div>
           <p className="text-[15px] text-sub">
-            Deciding <b className="text-ink">what to record</b> and <b className="text-ink">what to say</b>,
-            scene by scene
+            Deciding <b className="text-ink">what to&nbsp;record</b> and <b className="text-ink">what to&nbsp;say</b>,
+            scene by&nbsp;scene
           </p>
         </div>
         {stepper}

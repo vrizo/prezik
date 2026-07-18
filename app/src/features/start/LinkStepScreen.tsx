@@ -68,14 +68,14 @@ function MinimalCard({ navigate }: Props) {
   return (
     <div className="mx-auto mt-14 mb-8 max-w-[560px] px-4">
       <div className="flex flex-col items-center gap-4 rounded-[30px] border border-line bg-bg px-8 py-14 text-center">
-        <h1 className="m-0 text-2xl font-bold tracking-[-0.02em]">Start with your app's link</h1>
-        <p className="m-0 text-sm text-sub">We need a URL to explore before we can personalise a demo.</p>
+        <h1 className="m-0 text-2xl font-bold tracking-[-0.02em]">Start with&nbsp;your app's link</h1>
+        <p className="m-0 text-sm text-sub">We need a&nbsp;URL to&nbsp;explore before we can personalise a&nbsp;demo.</p>
         <button
           type="button"
           onClick={() => navigate("/")}
           className="h-12 rounded-full bg-ink px-7 text-sm font-semibold text-white hover:bg-[#44403a]"
         >
-          Go to Prezik
+          Go to&nbsp;Prezik
         </button>
       </div>
     </div>
@@ -281,7 +281,7 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
               </button>
 
               <span className="text-xs text-faint">
-                Prezik starts exploring the moment you begin — pay per run
+                Prezik starts exploring the&nbsp;moment you begin — pay per&nbsp;run
               </span>
             </div>
           </div>
@@ -297,7 +297,7 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
       >
         <h2 className="m-0 mb-2.5 text-[23px] font-bold tracking-[-0.02em]">Enter your coupon code</h2>
         <p className="m-0 mb-[22px] text-sm leading-[1.55] text-sub">
-          Prezik is pay per run — apply a coupon to start this one.
+          Prezik is pay per&nbsp;run — apply a&nbsp;coupon to&nbsp;start this one.
         </p>
         <form
           onSubmit={(e) => {

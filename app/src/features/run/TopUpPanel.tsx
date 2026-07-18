@@ -52,7 +52,7 @@ export function TopUpPanel() {
 
   return (
     <div className="rounded-[22px] border border-line bg-[#ece9e3] p-6">
-      <h3 className="m-0 text-[22px] font-bold tracking-[-0.02em]">Top up your runs</h3>
+      <h3 className="m-0 text-[22px] font-bold tracking-[-0.02em]">Top up&nbsp;your runs</h3>
       <p className="mb-4 mt-1 text-[13px] text-sub">No subscription — runs never expire</p>
 
       <div className="flex flex-col gap-[10px]" role="radiogroup" aria-label="Run pack">
@@ -120,7 +120,7 @@ export function TopUpPanel() {
         Get {pack.runs} runs — ${pack.price}
       </button>
       {showPaymentsNote && (
-        <p className="mt-2 text-[13px] text-sub">Payments are coming soon — use a coupon for now.</p>
+        <p className="mt-2 text-[13px] text-sub">Payments are coming soon — use a&nbsp;coupon for&nbsp;now.</p>
       )}
     </div>
   );

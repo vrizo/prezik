@@ -27,7 +27,7 @@ export function deriveCredentials(draft: CredentialsDraft): {
     if (!email && !password) return { credentials: { mode: "none" }, error: null };
     return {
       credentials: { mode: "none" },
-      error: "Enter both a test email and password, or leave both blank.",
+      error: "Enter both a\u00A0test email and password, or leave both blank.",
     };
   }
   const emailDomain = draft.emailDomain.trim();
@@ -57,11 +57,11 @@ export const CredentialsFields = forwardRef<HTMLInputElement, Props>(function Cr
         <span className="rounded-full bg-chip px-[9px] py-0.5 text-[12px] font-semibold text-faint">Optional</span>
       </div>
       <p className="m-0 mb-4 ml-[30px] text-[13px] text-sub">
-        Add a test login so the demo shows real data instead of an empty state
+        Add a&nbsp;test login so the&nbsp;demo shows real data instead of&nbsp;an&nbsp;empty state
       </p>
 
       {draft.mode === "login" ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Test email">
             <input
               ref={emailRef}
@@ -103,18 +103,18 @@ export const CredentialsFields = forwardRef<HTMLInputElement, Props>(function Cr
           onChange={(e) => onStoreChange(e.target.checked)}
           className="h-[15px] w-[15px] cursor-pointer accent-ink"
         />
-        Remember in this browser for next time
+        Remember in&nbsp;this browser for&nbsp;next time
       </label>
 
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-xs text-faint">Used once for this run, then deleted from our servers</span>
+      <div className="mt-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <span className="text-xs text-faint">Used once for&nbsp;this run, then deleted from&nbsp;our servers</span>
         {draft.mode === "login" ? (
           <button
             type="button"
             onClick={() => onChange(EMPTY_SIGNUP_DRAFT)}
             className="whitespace-nowrap text-xs font-semibold text-sub underline decoration-line2 underline-offset-2 hover:text-ink"
           >
-            No test account? Let Prezik sign up itself
+            No test account? Let Prezik sign up&nbsp;itself
           </button>
         ) : (
           <button
@@ -122,7 +122,7 @@ export const CredentialsFields = forwardRef<HTMLInputElement, Props>(function Cr
             onClick={() => onChange(EMPTY_LOGIN_DRAFT)}
             className="whitespace-nowrap text-xs font-semibold text-sub underline decoration-line2 underline-offset-2 hover:text-ink"
           >
-            Have a test account? Use login instead
+            Have a&nbsp;test account? Use login instead
           </button>
         )}
       </div>

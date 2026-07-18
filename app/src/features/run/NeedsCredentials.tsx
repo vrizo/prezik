@@ -28,10 +28,10 @@ export function NeedsCredentials({ open, reason, onAddCredentials, onBackToStart
           <path d="M8 11V8a4 4 0 0 1 8 0v3" />
         </svg>
       </div>
-      <h2 className="mb-[10px] text-[23px] font-bold tracking-[-0.02em]">This demo needs a sign-in</h2>
+      <h2 className="mb-[10px] text-[23px] font-bold tracking-[-0.02em]">This demo needs a&nbsp;sign-in</h2>
       <p className="mb-[22px] text-[14px] leading-[1.55] text-sub">
         {reason ??
-          "This product hides its best features behind a login. Start a fresh run with test credentials so the demo shows the real product."}
+          "This product hides its best features behind a\u00A0login. Start a\u00A0fresh run with\u00A0test credentials so the\u00A0demo shows the\u00A0real product."}
       </p>
       <div className="flex flex-col gap-[10px]">
         <button
@@ -46,7 +46,7 @@ export function NeedsCredentials({ open, reason, onAddCredentials, onBackToStart
           onClick={onBackToStart}
           className="h-12 rounded-full border border-line2 bg-white text-[15px] font-semibold text-ink hover:bg-chip"
         >
-          Back to start
+          Back to&nbsp;start
         </button>
       </div>
     </Modal>

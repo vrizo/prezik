@@ -71,7 +71,7 @@ export function RecordView({ events, storyboard, frames, sceneIndex, live, uploa
         <div className="flex-1">
           <div className="flex items-center gap-[10px]">
             <h2 className="whitespace-nowrap text-[26px] font-bold tracking-[-0.025em]">
-              {uploading ? "Finishing your video" : "Recording the demo"}
+              {uploading ? "Finishing your video" : "Recording the\u00A0demo"}
             </h2>
             {uploading ? (
               <SpinnerArc size={20} strokeColor="#605c55" />
@@ -84,7 +84,7 @@ export function RecordView({ events, storyboard, frames, sceneIndex, live, uploa
           </div>
           {!uploading && (
             <p className="mt-1 text-[15px] text-sub">
-              Now capturing <b className="text-ink">{currentPath}</b> — following the storyboard — {timer}
+              Now capturing <b className="text-ink">{currentPath}</b> — following the&nbsp;storyboard — {timer}
             </p>
           )}
         </div>
@@ -95,7 +95,7 @@ export function RecordView({ events, storyboard, frames, sceneIndex, live, uploa
         <span className="text-[13px] font-bold">Captured frames</span>
         {sceneIndex !== null && sceneCount > 0 && (
           <span className="text-[12px] text-faint">
-            Scene {sceneIndex + 1} of {sceneCount}
+            Scene {sceneIndex + 1} of&nbsp;{sceneCount}
           </span>
         )}
       </div>

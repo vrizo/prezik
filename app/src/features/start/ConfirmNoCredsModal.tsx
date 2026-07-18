@@ -31,9 +31,9 @@ export function ConfirmNoCredsModal({ open, onClose, onContinueAnyway }: Props) 
       </div>
       <h2 className="m-0 mb-2.5 text-[23px] font-bold tracking-[-0.02em]">Continue without test credentials?</h2>
       <p className="m-0 mb-[22px] text-sm leading-[1.55] text-sub">
-        Prezik will record the logged-out experience. If your best features live behind a login or a paywall, they
-        won't appear — most paid products look empty without a sign-in. Adding a test account makes for a far
-        stronger demo.
+        Prezik will record the&nbsp;logged-out experience. If your best features live behind a&nbsp;login or
+        a&nbsp;paywall, they won't appear — most paid products look empty without a&nbsp;sign-in. Adding a&nbsp;test
+        account makes for&nbsp;a&nbsp;far stronger demo.
       </p>
       <div className="flex flex-col gap-2.5">
         <button
