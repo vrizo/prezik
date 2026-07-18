@@ -1,4 +1,7 @@
 
+<a href="https://prezik.vrizo.net/">
+    <img src="docs/assets/prezik-logo-horizontal.png" alt="Prezik" height="96" align="left">
+</a>
 <a href="https://techeurope.io/hackathons/berlin-summer-lock-in">
     <img src="docs/assets/tech-europe-logo.svg" alt="{Tech: Europe} Summer Lock-In — Berlin, July 18 2026" width="96" height="96" align="right">
 </a>
