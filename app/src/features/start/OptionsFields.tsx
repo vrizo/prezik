@@ -22,7 +22,7 @@ const VOICE_LABELS: Record<PersonalisationOptions["voice"], string> = {
 const VOICES: PersonalisationOptions["voice"][] = ["neutral", "male", "female"];
 const VOICE_ORBS: Record<PersonalisationOptions["voice"], OrbTheme> = {
   neutral: "mono",
-  male: "blue",
+  male: "green",
   female: "orange",
 };
 
@@ -166,41 +166,57 @@ export function OptionsFields({ options, onChange }: Props) {
         </div>
       </Row>
 
-      {/* Captions — coming soon, always off */}
+      {/* Captions */}
       <Row label="Captions">
-        <span className="flex cursor-not-allowed items-center gap-2.5">
-          <span className="rounded-[5px] bg-chip px-1.5 py-px text-[10px] font-bold text-faint">soon</span>
-          <span
-            role="switch"
-            aria-checked="false"
-            aria-disabled="true"
-            aria-label="Captions (coming soon)"
-            className="relative h-[27px] w-[46px] flex-none rounded-full bg-chip opacity-60"
-          >
-            <span className="absolute left-[3px] top-[3px] h-[21px] w-[21px] rounded-full bg-white" />
-          </span>
-        </span>
+        <Toggle checked={options.captions} onChange={(captions) => onChange({ ...options, captions })} label="Captions" />
       </Row>
 
-      {/* Format — static, stores nothing */}
+      {/* Format */}
       <Row label="Format" last>
         <div className="flex gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-ink px-[15px] py-2 text-[13px] font-semibold text-white">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden="true">
-              <rect x="3" y="6" width="18" height="12" rx="2" />
-            </svg>
-            Horizontal 16:9
-          </span>
-          <span className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-line px-[15px] py-2 text-[13px] font-semibold text-faint">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden="true">
-              <rect x="6" y="3" width="12" height="18" rx="2" />
-            </svg>
-            Vertical 9:16
-            <span className="rounded-[5px] bg-chip px-1.5 py-px text-[10px] font-bold text-faint">soon</span>
-          </span>
+          <FormatButton
+            active={(options.format ?? "horizontal") === "horizontal"}
+            onClick={() => onChange({ ...options, format: "horizontal" })}
+            label="Horizontal 16:9"
+            rect={{ x: 3, y: 6, width: 18, height: 12 }}
+          />
+          <FormatButton
+            active={options.format === "vertical"}
+            onClick={() => onChange({ ...options, format: "vertical" })}
+            label="Vertical 9:16"
+            rect={{ x: 6, y: 3, width: 12, height: 18 }}
+          />
         </div>
       </Row>
     </div>
+  );
+}
+
+function FormatButton({
+  active,
+  onClick,
+  label,
+  rect,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  rect: { x: number; y: number; width: number; height: number };
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 rounded-full px-[15px] py-2 text-[13px] font-semibold ${
+        active ? "bg-ink text-white" : "border border-line text-sub hover:bg-chip"
+      }`}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden="true">
+        <rect x={rect.x} y={rect.y} width={rect.width} height={rect.height} rx="2" />
+      </svg>
+      {label}
+    </button>
   );
 }
 
