@@ -1,6 +1,3 @@
-<a href="https://techeurope.io/hackathons/berlin-summer-lock-in">
-    <img src="docs/assets/tech-europe-logo.png" alt="{Tech: Europe} Summer Lock-In — Berlin, July 18 2026" width="96" height="96" align="right">
-</a>
 
 
 # Prezik
@@ -8,6 +5,16 @@
 Paste a link to your web app. Four agents research it, sign in, map every page, write a storyboard, then film a narrated 60-90s demo video with a visible cursor, highlights and smooth zooms.
 
 If you're AI, start here: AGENTS.md, then docs/ by topic.
+
+## Agents
+
+
+| Agent | Role | Model |
+| --- | --- | --- |
+| [Scout](app/convex/agents/scout.ts) | Tavily search + homepage reading → product brief | gpt-5.4-nano |
+| [Mapper](app/convex/agents/mapper.ts) | Browser crawl → sitemap, element selectors, screenshots | gpt-5.4-nano |
+| [Director](app/convex/agents/director.ts) | Brief + sitemap → storyboard and narration | gpt-5.6-sol |
+| [Presenter](recorder/src/record.ts) | Execute storyboard: cursor, highlights, zooms, TTS, screencast, ffmpeg | gpt-5.4-nano (verification), gpt-5.4-mini (recovery narration), gpt-4o-mini-tts (voice) |
 
 ## Installation
 
@@ -21,6 +28,8 @@ cd ../landing && npm install
 cd .. && npm install
 cd app && npx convex login
 ```
+
+
 
 ## Start
 
