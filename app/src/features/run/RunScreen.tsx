@@ -51,12 +51,12 @@ export function RunScreen({ runId, navigate }: Props) {
 
   if (run === undefined) {
     return (
-      <main className="grid min-h-screen place-items-center bg-page text-[15px] text-sub">Loading…</main>
+      <main className="grid place-items-center bg-page py-40 text-[15px] text-sub">Loading…</main>
     );
   }
   if (run === null) {
     return (
-      <main className="grid min-h-screen place-items-center bg-page text-[15px] text-sub">
+      <main className="grid place-items-center bg-page py-40 text-[15px] text-sub">
         <div className="text-center">
           <p>Run not found.</p>
           <button
@@ -99,23 +99,20 @@ export function RunScreen({ runId, navigate }: Props) {
   const sceneIndex = currentSceneIndex(events, storyboard ?? null);
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden">
-      <GradientBackdrop variant="creating" className={revealed ? "anim-reveal-in" : ""} />
+    <main className="relative w-full">
+      <GradientBackdrop
+        variant="creating"
+        attachment="fixed"
+        className={revealed ? "anim-reveal-in" : ""}
+      />
 
       <div className="relative mx-auto my-8 max-w-[1050px] rounded-[22px] bg-white px-10 py-8 shadow-[0_30px_70px_rgba(0,0,0,.22)]">
         <PhaseStepper phase="creating" className="mb-[26px]" />
 
+        {/* The step view always renders — a failure adds the error box below
+            it instead of hiding the run's progress. */}
         <div className="flex flex-col">
-          {isErrorView ? (
-            <ErrorPanel
-              run={run}
-              events={events}
-              frames={frames}
-              step={failedStepValue}
-              stepper={stepper}
-              onRetry={handleRerecord}
-            />
-          ) : viewedStep === "explore" ? (
+          {viewedStep === "explore" ? (
             <ExploreView
               run={run}
               sitePages={sitePages}
@@ -138,6 +135,9 @@ export function RunScreen({ runId, navigate }: Props) {
           )}
         </div>
 
+        {isErrorView && (
+          <ErrorPanel run={run} events={events} step={failedStepValue} onRetry={handleRerecord} />
+        )}
       </div>
 
       {run.status === "needs_credentials" && (

@@ -18,8 +18,22 @@ const DEFAULT_PERSONALISATION: PersonalisationOptions = {
   voice: "neutral",
   zoom: true,
   length: "short",
-  captions: true,
+  captions: false, // coming soon — can't be enabled
 };
+
+const OPTIONS_STORAGE_KEY = "prezik.options";
+
+// Last-used personalisation, restored across visits. Captions is forced off
+// (coming soon) even if an older stored value had it on.
+function loadStoredOptions(): PersonalisationOptions {
+  try {
+    const raw = localStorage.getItem(OPTIONS_STORAGE_KEY);
+    if (raw) return { ...DEFAULT_PERSONALISATION, ...JSON.parse(raw), captions: false };
+  } catch {
+    // corrupted storage — fall back to defaults
+  }
+  return DEFAULT_PERSONALISATION;
+}
 
 type Session = { sessionId: Id<"sessions">; credits: number; couponCode?: string };
 type Props = { navigate: (path: string, opts?: { freshRun?: boolean }) => void };
@@ -34,7 +48,7 @@ export function LinkStepScreen({ navigate }: Props) {
 
 function MinimalCard({ navigate }: Props) {
   return (
-    <div className="mx-auto my-14 max-w-[560px] px-4">
+    <div className="mx-auto mt-14 mb-8 max-w-[560px] px-4">
       <div className="flex flex-col items-center gap-4 rounded-[30px] border border-line bg-bg px-8 py-14 text-center">
         <h1 className="m-0 text-2xl font-bold tracking-[-0.02em]">Start with your app's link</h1>
         <p className="m-0 text-sm text-sub">We need a URL to explore before we can personalise a demo.</p>
@@ -53,7 +67,12 @@ function MinimalCard({ navigate }: Props) {
 function LinkStepForm({ url, navigate }: { url: string } & Props) {
   const [anonId] = useState(getOrCreateAnonId);
   const [session, setSession] = useState<Session | null>(null);
-  const [personalisation, setPersonalisation] = useState<PersonalisationOptions>(DEFAULT_PERSONALISATION);
+  const [personalisation, setPersonalisation] = useState<PersonalisationOptions>(loadStoredOptions);
+
+  function updatePersonalisation(next: PersonalisationOptions) {
+    setPersonalisation(next);
+    localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(next));
+  }
   const [credDraft, setCredDraft] = useState<CredentialsDraft>(EMPTY_LOGIN_DRAFT);
   const [couponInput, setCouponInput] = useState("");
   const [couponMessage, setCouponMessage] = useState<string | null>(null);
@@ -140,10 +159,10 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
   }
 
   return (
-    <div className="mx-auto my-14 max-w-[1120px] px-4">
+    <div className="mx-auto mt-14 mb-8 max-w-[1120px] px-4">
       <div className="overflow-hidden rounded-[30px] border border-line bg-bg">
         <div className="flex flex-wrap items-center gap-3.5 border-b border-line px-[30px] py-5">
-          <Logo size={30} />
+          <Logo size={60} />
           <div className="ml-3.5 flex items-center gap-2 rounded-full border border-line2 bg-white px-3.5 py-1.5">
             <svg
               width="12"
@@ -175,7 +194,7 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
           <PhaseStepper phase="link" className="mb-[26px]" />
 
           <div className="mx-auto flex max-w-[620px] flex-col gap-5">
-            <OptionsFields options={personalisation} onChange={setPersonalisation} />
+            <OptionsFields options={personalisation} onChange={updatePersonalisation} />
             <CredentialsFields ref={emailRef} draft={credDraft} onChange={setCredDraft} error={credError} />
 
             {submitError && <p className="text-center text-sm text-red-600">{submitError}</p>}

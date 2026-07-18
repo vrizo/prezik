@@ -75,12 +75,12 @@ export function RecordView({ events, storyboard, frames, sceneIndex, live, uploa
             </h2>
             {uploading ? (
               <SpinnerArc size={20} strokeColor="#605c55" />
-            ) : (
+            ) : live ? (
               <span className="inline-flex items-center gap-[6px] rounded-full bg-[#111] px-[11px] py-[5px]">
                 <span className="anim-blink h-[7px] w-[7px] rounded-full bg-[#ff5436]" />
                 <span className="text-[11px] font-bold tracking-[0.08em] text-white">REC</span>
               </span>
-            )}
+            ) : null}
           </div>
           {!uploading && (
             <p className="mt-1 text-[15px] text-sub">

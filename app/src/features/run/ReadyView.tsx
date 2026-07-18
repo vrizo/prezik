@@ -39,7 +39,7 @@ export function ReadyView({ run, onRerecord }: Props) {
   const meta = formatMeta(run.durationSec);
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-4 py-10">
+    <main className="relative flex justify-center px-4 pt-10 pb-8">
       <Confetti />
 
       <div className="relative w-full max-w-[1050px] rounded-[30px] border border-line bg-bg px-10 py-9">

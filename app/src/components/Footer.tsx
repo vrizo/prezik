@@ -1,5 +1,5 @@
-import { Logo } from "./Logo";
 import techEuropeLogo from "../assets/tech-europe-logo.svg";
+import wordmark from "../assets/prezik-4a.png";
 
 // Shared site footer, rendered on every screen by App. `maxWidthClass` lets
 // each route match the footer to its content width (run screens are 1050px).
@@ -10,7 +10,8 @@ export function Footer({ maxWidthClass = "max-w-[1120px]" }: { maxWidthClass?: s
         <div className="grid grid-cols-1 gap-7 sm:grid-cols-[1.5fr_1fr]">
           <div>
             <div className="mb-3">
-              <Logo tone="cream" size={30} />
+              {/* Text-only wordmark; the PNG is ink, inverted to read on the dark footer. */}
+              <img src={wordmark} alt="Prezik" className="h-9 w-auto invert" />
             </div>
             <p className="m-0 max-w-[280px] text-sm leading-[1.5] text-white/60">
               Paste a link, get a narrated demo video. Built for builders shipping fast.

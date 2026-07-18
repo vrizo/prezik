@@ -15,9 +15,9 @@ animated transitions of highlight frame
 ---
 motion blur?
 ---
-logo at the end + link to the product
+
 ---
-Improve the highlighting frame in the videos. It should appear and disappear with transition. The frame should be dark gray.
+Improve the highlighting frame in the videos. It should appear and disappear with transition. The frame should be dark gray semi-transparent.
 ---
 - in the current version there is no way to edit plan or text, so it is generated ready-only.
 ---
@@ -26,11 +26,11 @@ VIDEO RECORDING FIXES:
 ---
 show transcript button at the end
 ---
-save in local storage the selected options
+
 ---
 add human agent presenter
 ---
-do not use google fonts CDN
+
 ---
 
 Custom instructions:

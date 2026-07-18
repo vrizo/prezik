@@ -108,7 +108,6 @@ export function PlanView({ storyboard, live, stepper }: Props) {
           <div className="my-[22px] flex flex-wrap items-center gap-2">
             <span className="mr-1 text-[12px] font-semibold text-faint">Flow</span>
             <span className="flex items-center gap-[6px] rounded-full border border-dashed border-line2 px-[14px] py-[7px] text-[13px] font-semibold text-faint">
-              {live && <SpinnerArc size={12} className="relative top-[2px]" />}
               {live ? "writing…" : "no plan yet"}
             </span>
           </div>
@@ -119,7 +118,6 @@ export function PlanView({ storyboard, live, stepper }: Props) {
             </div>
             <div className="flex flex-col justify-center gap-2">
               <span className="flex items-center gap-[6px] text-[12px] font-semibold text-sub">
-                {live && <SpinnerArc size={12} className="relative top-[2px]" />}
                 {live ? "writing" : "no plan was written"}
               </span>
               <span className="anim-pulse-soft h-3 w-3/4 rounded bg-chip" />

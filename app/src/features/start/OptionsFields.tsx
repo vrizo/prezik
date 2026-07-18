@@ -166,9 +166,20 @@ export function OptionsFields({ options, onChange }: Props) {
         </div>
       </Row>
 
-      {/* Captions */}
+      {/* Captions — coming soon, always off */}
       <Row label="Captions">
-        <Toggle checked={options.captions} onChange={(captions) => onChange({ ...options, captions })} label="Captions" />
+        <span className="flex cursor-not-allowed items-center gap-2.5">
+          <span className="rounded-[5px] bg-chip px-1.5 py-px text-[10px] font-bold text-faint">soon</span>
+          <span
+            role="switch"
+            aria-checked="false"
+            aria-disabled="true"
+            aria-label="Captions (coming soon)"
+            className="relative h-[27px] w-[46px] flex-none rounded-full bg-chip opacity-60"
+          >
+            <span className="absolute left-[3px] top-[3px] h-[21px] w-[21px] rounded-full bg-white" />
+          </span>
+        </span>
       </Row>
 
       {/* Format — static, stores nothing */}

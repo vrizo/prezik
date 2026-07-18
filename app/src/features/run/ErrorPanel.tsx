@@ -95,25 +95,3 @@ export function ErrorPanel({ run, events, step, onRetry }: Props) {
     </div>
   );
 }
-
-// Non-critical errors while the run keeps going: a quiet log under the step
-// view, plus a note when we're being rate-limited.
-export function ErrorNotes({ events }: { events: Events }) {
-  const errorEvents = events.filter((event) => event.level === "error");
-  if (errorEvents.length === 0) return null;
-  const rateLimited = errorEvents.some((event) => /\b429\b/.test(event.message));
-
-  return (
-    <div className="mt-[22px] rounded-[14px] border border-[#f0dcc3] bg-[#fdf8ef] px-[16px] py-[12px]">
-      <div className="mb-1 text-[12px] font-bold text-[#9a6300]">
-        Some pages had hiccups — the run continues
-        {rateLimited && " (rate limited, slowing down the crawl)"}
-      </div>
-      <div className="font-mono text-[12px] leading-[1.7] text-[#8a6a3a]">
-        {errorEvents.map((event, index) => (
-          <div key={index}>{event.message}</div>
-        ))}
-      </div>
-    </div>
-  );
-}

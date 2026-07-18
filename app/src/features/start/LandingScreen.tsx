@@ -39,7 +39,8 @@ export function LandingScreen({ navigate }: Props) {
     <div className="mx-auto mt-14 mb-8 flex max-w-[1120px] flex-col gap-8 px-4">
       <div className="overflow-hidden rounded-[30px] border border-line bg-bg">
         <div className="flex items-center gap-3.5 px-[30px] py-[22px]">
-          <Logo size={34} />
+          {/* box-content keeps the drawn logo at 68px with the padding added on top */}
+          <Logo size={68} className="box-content pt-[29px]" />
         </div>
 
         <div className="grid grid-cols-1 items-center gap-[30px] px-[30px] pb-[34px] pt-4 lg:grid-cols-[1.05fr_.95fr]">

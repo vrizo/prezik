@@ -39,6 +39,18 @@ export function ExploreView({ run, sitePages, events, live, stepper }: Props) {
     }
   }
 
+  // Pages that errored (429s, unreachable, …) stay in the list with their
+  // HTTP code instead of vanishing — the run continues without them.
+  const pageErrors = new Map<string, { message: string; code: string | null }>();
+  for (const event of events) {
+    if (event.level !== "error" || !event.url) continue;
+    const path = pathOf(event.url);
+    if (knownPaths.has(path)) continue;
+    const code = event.message.match(/\b([45]\d\d)\b/);
+    pageErrors.set(path, { message: event.message, code: code ? code[1] : null });
+  }
+  if (inProgress && pageErrors.has(inProgress)) inProgress = null;
+
   return (
     <>
       <div className="flex items-center gap-[14px]">
@@ -80,6 +92,17 @@ export function ExploreView({ run, sitePages, events, live, stepper }: Props) {
             <span className="text-[14px] font-semibold">{page.title}</span>
             <span className="text-[13px] text-sub">{page.purpose}</span>
             <span className="text-right text-[12px] font-semibold text-[#1a7f37]">read</span>
+          </div>
+        ))}
+
+        {[...pageErrors.entries()].map(([path, error]) => (
+          <div key={path} className={`${ROW} border-b border-line px-[18px] py-[13px]`}>
+            <code className="font-mono text-[13px]">{path}</code>
+            <span className="text-[14px] font-semibold text-faint">—</span>
+            <span className="truncate text-[13px] text-sub">{error.message}</span>
+            <span className="text-right text-[12px] font-semibold text-[#c0392b]">
+              {error.code ?? "error"}
+            </span>
           </div>
         ))}
 
