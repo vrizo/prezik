@@ -7,26 +7,30 @@
 - format: vertical (tiktok) or horizontal [dropdown] (horizontal 16:9 by default)
 
 ---
-style of highlights: hand drawn, strict frame
+new option: style of highlights: hand drawn, strict frame
 ---
 email notifications
 ---
-Clicking Start creating now plays the transition — the grainy colorful background expands from the center point out to fill the whole screen, with a "Creating your demo…" flourish, before revealing the Creating phase
-
-
+animated transitions of highlight frame
+---
+motion blur?
+---
+logo at the end + link to the product
+---
+Improve the highlighting frame in the videos. It should appear and disappear with transition. The frame should be dark gray.
+---
 - in the current version there is no way to edit plan or text, so it is generated ready-only.
 ---
-show transcript button at the end
+VIDEO RECORDING FIXES:
+- reduce resolution of the browser, because elements are too small. Keep full hd video at the end. Maybe you should scale the page instead.
 ---
-Currently the flow generates a video that focuses on the documentation (check logs of logs/run-12). But the idea is to one agent to investigate all the information, get the knowledge about the product, and then record the app, the product, the service rather than the documentation. It is intended for tools, services, not for demoing landing pages.
-
-Please iterate the flow and try to adjust it to focus the recording on the product, not on docs.
-
-If the agent stucks because it requires test credentials, but credentials are not provided, then it should stop and report to the UI. The UI should accept this system message. The user should start again providing the test credentials. This is actual for the products, services, web sites that require signing in. It is not requires for the pages that don't need registration.
+show transcript button at the end
 ---
 save in local storage the selected options
 ---
 add human agent presenter
+---
+do not use google fonts CDN
 ---
 
 Custom instructions:
@@ -46,7 +50,5 @@ You should be a manager of agents and delegate work if possible.
 Please write docs, skills and replies in plain English with little formatting (I don't like to read a lot).
 
 Do not change production queue or AI worker. Only staging env is allowed to update.
-
-Use xcode mcp (open the project if needed).
 
 There are no users yet, so no backward compatibility needed. Do not store any legacy attributes.
