@@ -24,6 +24,7 @@ export const runStatusValidator = v.union(
   v.literal("created"),
   v.literal("exploring"),
   v.literal("planning"),
+  v.literal("needs_credentials"),
   v.literal("recording"),
   v.literal("uploading"),
   v.literal("done"),

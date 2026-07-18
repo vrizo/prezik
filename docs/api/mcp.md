@@ -6,7 +6,7 @@ Endpoint: /mcp on the app host (present-staging.vrizo.net/mcp on staging, app.pr
 
 Tools:
 - create_run { url, options? } — start a video run. Returns runId and sessionId.
-- get_run { runId } — status, and when done the playback URL and stream uid.
+- get_run { runId } — status, and when done the playback URL and stream uid. Status "needs_credentials" means the site requires sign-in and no credentials were provided; start a new run with credentials.
 - list_events { runId, after? } — the live agent feed.
 
 The HTTP surface behind it is described in app/public/openapi.json and docs/api/http.md. Connect example (Claude Code): claude mcp add prezik --transport http https://present-staging.vrizo.net/mcp

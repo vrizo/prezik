@@ -4,15 +4,16 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Scene, SceneAction, Storyboard } from "@prezik/shared";
 import { VOICE_MAP } from "@prezik/shared";
+import { dismissConsentBanner, performAuth } from "./auth.js";
 import type { Emitter } from "./callbacks.js";
 import { attachBrowserTelemetry } from "./diag.js";
 import type { Logger } from "./log.js";
 import type { Credentials, RecordOptions } from "./types.js";
 import { synthesizeSpeech } from "./tts.js";
 import { assembleAndMux, probeDurationMs, type AudioPlacement } from "./ffmpeg.js";
-import { buildConcat, startScreencast } from "./screencast.js";
+import { buildConcat, compressSilence, startScreencast, MAX_SILENCE_GAP_MS } from "./screencast.js";
 import { buildVtt, type VttSegment } from "./vtt.js";
-import { remainingWaitMs, SILENT_SEGMENT_MS } from "./timing.js";
+import { beatStartOffsets, remainingWaitMs, SILENT_SEGMENT_MS } from "./timing.js";
 import {
   cursorInitScript,
   esbuildHelperInitScript,
@@ -136,20 +137,31 @@ async function gotoForScene(page: Page, url: string, emit: Emitter): Promise<voi
 }
 
 async function runAction(page: Page, action: SceneAction, creds: ResolvedCreds, emit: Emitter, log: Logger): Promise<void> {
+  // Selectors were harvested from the fully rendered page, but after a scene
+  // goto an SPA may still be fetching data — so every selector-based action
+  // first waits for its element to be visible. Locator actions (click/fill/
+  // hover) auto-wait anyway; the evaluate-based ones (cursor move, highlight,
+  // zoom) do not, and would otherwise fail on a page that is still rendering.
+  const awaitSelector = async (selector: string) => {
+    await page.locator(selector).first().waitFor({ state: "visible", timeout: 10000 });
+  };
   switch (action.type) {
     case "goto":
       await gotoForScene(page, action.url, emit);
       await page.waitForTimeout(600);
       return;
     case "click":
+      await awaitSelector(action.selector);
       await moveCursorToSelector(page, action.selector);
       await page.locator(action.selector).first().click({ timeout: 8000 });
       return;
     case "hover":
+      await awaitSelector(action.selector);
       await moveCursorToSelector(page, action.selector);
       await page.locator(action.selector).first().hover({ timeout: 8000 });
       return;
     case "fill":
+      await awaitSelector(action.selector);
       await moveCursorToSelector(page, action.selector);
       await page.locator(action.selector).first().fill(fillValue(action.value, creds), { timeout: 8000 });
       return;
@@ -161,9 +173,14 @@ async function runAction(page: Page, action: SceneAction, creds: ResolvedCreds, 
       await page.waitForTimeout(500);
       return;
     case "highlight":
+      await awaitSelector(action.selector);
+      // Glide the cursor along with the spotlight so the pointer tracks what
+      // the narrator is describing instead of sitting parked at the edge.
+      await moveCursorToSelector(page, action.selector);
       await highlightSelector(page, action.selector);
       return;
     case "zoom":
+      await awaitSelector(action.selector);
       await zoomToSelector(page, action.selector, action.paddingPx);
       return;
     case "zoomOut":
@@ -218,12 +235,40 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
   const page = await context.newPage();
   const telemetry = attachBrowserTelemetry(page, job.log);
 
+  // Off-camera pre-roll, before the screencast starts: sign in (login never
+  // appears in the video — the storyboard no longer contains login scenes) and
+  // dismiss any cookie banner so it neither shows in frames nor blocks clicks.
+  // Strict auth: a failed sign-in fails the run loudly (the record job wrapper
+  // reports recorderFailed).
+  await gotoForScene(page, job.storyboard.targetUrl, job.emit);
+  await dismissConsentBanner(page, job.log);
+  if (job.credentials && job.credentials.mode !== "none") {
+    await performAuth(page, job.credentials, job.emit, job.log, { strict: true, agent: "presenter" });
+    await dismissConsentBanner(page, job.log); // the app may show its own banner after login
+    await job.emit.emit({
+      kind: "event",
+      event: { agent: "presenter", level: "info", message: "signed in before recording", url: page.url() },
+    });
+  }
+
   const segments: Segment[] = [];
 
-  const runSegment = async (kind: Segment["kind"], id: string, narration: string, body: () => Promise<void>) => {
+  // preBody runs BEFORE the narration clock (startEpochMs) starts — used for a
+  // scene's leading goto so its loading state lands in the silent gap before this
+  // segment's narration clip (which the assembly-time silence compression cuts),
+  // not mid-narration. body receives startEpochMs so it can schedule visual beats
+  // relative to the narration start.
+  const runSegment = async (
+    kind: Segment["kind"],
+    id: string,
+    narration: string,
+    body: (startEpochMs: number) => Promise<void>,
+    preBody?: () => Promise<void>,
+  ) => {
+    if (preBody) await preBody();
     const startEpochMs = Date.now();
     const a = audio.get(id)!;
-    await body();
+    await body(startEpochMs);
     const wait = remainingWaitMs(a.ms, Date.now() - startEpochMs);
     if (wait > 0) await page.waitForTimeout(wait);
     segments.push({ kind, id, narration, audioPath: a.path, audioMs: a.ms, startEpochMs });
@@ -244,9 +289,26 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
           kind: "event",
           event: { agent: "presenter", level: "info", message: `scene ${scene.id}: ${scene.title}`, sceneId: scene.id },
         });
-        await runSegment("scene", scene.id, scene.narration, async () => {
-          await runScene(page, scene, creds, job.options.zoom, job.emit, job.log);
-        });
+        const a = audio.get(scene.id)!;
+        // A scene whose FIRST action is a goto navigates off-clock: run the goto
+        // and wait for the page to settle before the narration starts, so the
+        // load lands in the silent gap (later compressed away), not on camera.
+        const firstIsGoto = scene.actions.length > 0 && scene.actions[0].type === "goto";
+        await runSegment(
+          "scene",
+          scene.id,
+          scene.narration,
+          (startEpochMs) => runScene(page, scene, creds, job.options.zoom, job.emit, job.log, startEpochMs, a.ms, firstIsGoto),
+          firstIsGoto
+            ? async () => {
+                await runAction(page, scene.actions[0], creds, job.emit, job.log);
+                // Bounded, logged readiness wait — not a silent fallback.
+                await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {
+                  job.log.info("networkidle not reached, continuing");
+                });
+              }
+            : undefined,
+        );
         await job.emit.emit({ kind: "sceneDone", sceneId: scene.id });
         job.log.info(`scene done: ${scene.id}`);
       }
@@ -267,13 +329,38 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
   // The video's t=0 is the first captured frame; express narration offsets
   // relative to it.
   const videoStartMs = frames.timestampsMs[0];
-  const concatPath = join(framesDir, "frames.ffconcat");
-  writeFileSync(concatPath, buildConcat(frames.files, frames.timestampsMs, frames.endMs));
+  const rawOffsetOf = (s: Segment) => Math.max(0, Math.round(s.startEpochMs - videoStartMs));
 
-  const offsetOf = (s: Segment) => Math.max(0, Math.round(s.startEpochMs - videoStartMs));
+  // Cut long silent stretches (post-goto loading, dead air) down to a ceiling.
+  // The audio inside clips is never modified — only silent video time between
+  // clips is removed — so sync is preserved. Silent renders (tts=false) have no
+  // narration clips and therefore no silent-gap definition, so they deliberately
+  // keep real-time pacing and skip compression entirely.
+  let framesFiles = frames.files;
+  let framesTimestamps = frames.timestampsMs;
+  let framesEndMs = frames.endMs;
+  let clipOffsets: number[] | null = null;
+  if (job.tts) {
+    const rawClips = segments.map((s) => ({ offsetMs: rawOffsetOf(s), durationMs: s.audioMs }));
+    const compressed = compressSilence(frames.files, frames.timestampsMs, frames.endMs, rawClips, MAX_SILENCE_GAP_MS);
+    framesFiles = compressed.files;
+    framesTimestamps = compressed.timestampsMs;
+    framesEndMs = compressed.endMs;
+    clipOffsets = compressed.clipOffsetsMs;
+    job.log.info(`silence compression: ${frames.files.length} -> ${compressed.files.length} frames`);
+  }
+
+  // clipOffsets (when present) aligns 1:1 with segments; fall back to the raw
+  // wall-clock offset for silent renders.
+  const offsetOf = (s: Segment, i: number) => (clipOffsets ? clipOffsets[i] : rawOffsetOf(s));
+
+  const concatPath = join(framesDir, "frames.ffconcat");
+  writeFileSync(concatPath, buildConcat(framesFiles, framesTimestamps, framesEndMs));
+
   const placements: AudioPlacement[] = segments
-    .filter((s): s is Segment & { audioPath: string } => s.audioPath !== null)
-    .map((s) => ({ path: s.audioPath, offsetMs: offsetOf(s) }));
+    .map((s, i) => ({ s, i }))
+    .filter((x): x is { s: Segment & { audioPath: string }; i: number } => x.s.audioPath !== null)
+    .map(({ s, i }) => ({ path: s.audioPath, offsetMs: offsetOf(s, i) }));
 
   const mp4Path = join(job.outDir, `${job.runId}.mp4`);
   await assembleAndMux(concatPath, placements, mp4Path, job.log);
@@ -287,17 +374,48 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
 
   let captionsVtt: string | undefined;
   if (job.options.captions) {
-    const vttSegments: VttSegment[] = segments.map((s) => ({ startMs: offsetOf(s), audioMs: s.audioMs, narration: s.narration }));
+    const vttSegments: VttSegment[] = segments.map((s, i) => ({ startMs: offsetOf(s, i), audioMs: s.audioMs, narration: s.narration }));
     captionsVtt = buildVtt(vttSegments);
   }
 
   return { mp4Path, durationSec, captionsVtt };
 }
 
-async function runScene(page: Page, scene: Scene, creds: ResolvedCreds, zoomEnabled: boolean, emit: Emitter, log: Logger): Promise<void> {
-  for (const action of scene.actions) {
-    // Honor the zoom option: when off, skip zoom/zoomOut actions entirely.
-    if (!zoomEnabled && (action.type === "zoom" || action.type === "zoomOut")) continue;
+// Visual "beat" actions whose timing is spread across the narration.
+const ANCHOR_TYPES = new Set<SceneAction["type"]>(["highlight", "zoom", "zoomOut"]);
+
+async function runScene(
+  page: Page,
+  scene: Scene,
+  creds: ResolvedCreds,
+  zoomEnabled: boolean,
+  emit: Emitter,
+  log: Logger,
+  narrationStartMs: number,
+  narrationMs: number,
+  skipFirstAction: boolean, // the leading goto already ran off-clock in preBody
+): Promise<void> {
+  // Which actions actually run: the leading goto (when skipped) and, with zoom
+  // off, zoom/zoomOut are excluded. Anchor beats among the runners are spread
+  // evenly across the narration so highlights/zooms appear as the narrator
+  // describes them instead of all firing up front and freezing the video.
+  const willRun = (i: number, a: SceneAction) =>
+    !(skipFirstAction && i === 0) && !(!zoomEnabled && (a.type === "zoom" || a.type === "zoomOut"));
+  const anchorCount = scene.actions.filter((a, i) => willRun(i, a) && ANCHOR_TYPES.has(a.type)).length;
+  const slots = beatStartOffsets(narrationMs, anchorCount);
+
+  let anchorIndex = 0;
+  for (let i = 0; i < scene.actions.length; i++) {
+    const action = scene.actions[i];
+    if (!willRun(i, action)) continue;
+    if (ANCHOR_TYPES.has(action.type)) {
+      // Wait until this beat's slot relative to the narration start, unless the
+      // preceding actions already ran past it (never wait a negative amount).
+      const target = narrationStartMs + slots[anchorIndex];
+      anchorIndex++;
+      const wait = target - Date.now();
+      if (wait > 0) await page.waitForTimeout(wait);
+    }
     try {
       await runAction(page, action, creds, emit, log);
     } catch (e) {

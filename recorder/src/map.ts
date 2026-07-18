@@ -1,16 +1,19 @@
 import { chromium } from "playwright";
 import type { Page } from "playwright";
+import { dismissConsentBanner, performAuth } from "./auth.js";
 import { esbuildHelperInitScript } from "./browser.js";
 import type { Emitter } from "./callbacks.js";
 import { attachBrowserTelemetry } from "./diag.js";
 import type { Logger } from "./log.js";
 import type { MapRequest } from "./types.js";
-import { randomPassword, timestampId } from "./util.js";
 
 // Contract cap is 12 pages; MAP_MAX_PAGES is an explicit override (e.g. to keep
 // a crawl short and polite when testing) and never exceeds 12.
 const MAX_PAGES = Math.min(12, Number(process.env.MAP_MAX_PAGES) || 12);
 const MAX_MS = 3 * 60 * 1000;
+// docs/legal pages are near-useless for a product demo; a small sample is enough
+// for the planner, so at most this many low-priority pages are mapped per run.
+const MAX_LOW_PRIORITY = 2;
 
 // Dedupe key: origin + path, ignoring query and hash.
 function normalize(url: string): string {
@@ -149,94 +152,81 @@ async function screenshot(page: Page, emit: Emitter): Promise<string | null> {
   return emit.uploadScreenshot(jpeg);
 }
 
-// Best-effort login/signup. On any missing element, posts a precise error event
-// and returns so the crawl continues over public pages.
-async function handleAuth(page: Page, req: MapRequest, emit: Emitter, log: Logger): Promise<void> {
-  if (req.credentials.mode === "none") return;
-  const mode = req.credentials.mode;
-
-  const linkSelectors =
-    mode === "login"
-      ? ['a[href*="login" i]', 'a[href*="signin" i]', 'a[href*="sign-in" i]']
-      : ['a[href*="signup" i]', 'a[href*="sign-up" i]', 'a[href*="register" i]', 'a[href*="join" i]'];
-
-  let navigated = false;
-  for (const sel of linkSelectors) {
-    const el = page.locator(sel).first();
-    if ((await el.count()) > 0) {
-      try {
-        await el.click({ timeout: 5000 });
-        await page.waitForLoadState("domcontentloaded");
-        navigated = true;
-        break;
-      } catch { /* try next */ }
-    }
+// A discovered link is low-priority when its pathname looks like docs, blog, or
+// legal boilerplate — pages that add little to a product demo.
+export function isLowPriorityUrl(url: string): boolean {
+  let pathname: string;
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    return false;
   }
-  if (!navigated) {
-    const re = mode === "login" ? /log ?in|sign ?in/i : /sign ?up|register|create account|get started/i;
-    const byText = page.getByRole("link", { name: re }).first();
-    if ((await byText.count()) > 0) {
-      try {
-        await byText.click({ timeout: 5000 });
-        await page.waitForLoadState("domcontentloaded");
-        navigated = true;
-      } catch { /* fall through */ }
-    }
-  }
-
-  const emailInput = page.locator('input[type="email"], input[name*="email" i], input[id*="email" i]').first();
-  const passInput = page.locator('input[type="password"]').first();
-  const noEmail = (await emailInput.count()) === 0;
-  const noPass = (await passInput.count()) === 0;
-  if (noEmail || noPass) {
-    const missing = [noEmail ? "email input" : "", noPass ? "password input" : ""].filter(Boolean).join(" and ");
-    const msg = `${mode}: ${navigated ? "" : "no auth link found; "}${missing} not found at ${page.url()}; continuing with public pages`;
-    await emit.emit({ kind: "event", event: { agent: "mapper", level: "error", message: msg, url: page.url() } });
-    log.error(msg);
-    return;
-  }
-
-  let email: string;
-  let password: string;
-  if (mode === "signup") {
-    email = `${timestampId()}@${req.credentials.emailDomain}`;
-    password = randomPassword(16);
-  } else {
-    email = req.credentials.email;
-    password = req.credentials.password;
-  }
-  await emailInput.fill(email);
-  await passInput.fill(password);
-  const submit = page.locator('button[type="submit"], input[type="submit"]').first();
-  if ((await submit.count()) > 0) await submit.click({ timeout: 8000 }).catch(() => {});
-  else await passInput.press("Enter");
-  await page.waitForTimeout(2500);
-  log.info(`${mode} submitted as ${email}`);
-  if (mode === "signup") await emit.emit({ kind: "credentials", email, password });
+  return /\b(docs?|blog|privacy|terms|legal|policy|policies|changelog|cookies?)\b/i.test(pathname);
 }
 
 export async function runMap(req: MapRequest, emit: Emitter, log: Logger): Promise<void> {
-  const origin = new URL(req.url).origin;
+  // Crawl scope: the whole site, not just the starting origin — products often
+  // serve the live app from a subdomain (web.example.com) while the landing
+  // lives on example.com. Approximation: same last-two-label domain (right for
+  // .com/.app targets; multi-part public suffixes like .co.uk over-match,
+  // which at worst crawls a sibling site page).
+  const baseDomain = new URL(req.url).hostname.split(".").slice(-2).join(".");
+  const inScope = (link: string): boolean => {
+    try {
+      const host = new URL(link).hostname;
+      return host === baseDomain || host.endsWith("." + baseDomain);
+    } catch {
+      return false;
+    }
+  };
   // Same pinned flag as record.ts: never depend on Playwright's default for
   // the 64MB /dev/shm production container.
   const browser = await chromium.launch({ headless: true, args: ["--disable-dev-shm-usage"] });
-  const context = await browser.newContext({ viewport: { width: 1366, height: 900 } });
+  // Same viewport as recording (record.ts): selectors are harvested from this
+  // exact layout, and responsive pages restructure their DOM across widths —
+  // a mismatch makes harvested selectors dangle at record time.
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   await context.addInitScript(esbuildHelperInitScript());
   const page = await context.newPage();
   const telemetry = attachBrowserTelemetry(page, log);
   const deadline = Date.now() + MAX_MS;
   const seen = new Set<string>();
-  const queue: string[] = [req.url];
+  // Two queues: product pages first, docs/legal drained only when main is empty.
+  // The starting URL always goes to main.
+  const main: string[] = [req.url];
+  const low: string[] = [];
+  const enqueue = (link: string) => {
+    if (!inScope(link) || seen.has(normalize(link))) return;
+    (isLowPriorityUrl(link) ? low : main).push(link);
+  };
   let count = 0;
+  let lowCount = 0;
 
   try {
+    // Pre-crawl: dismiss any cookie banner once (consent persists for the whole
+    // context) so screenshots are clean and its buttons aren't harvested as
+    // page elements, then sign in when credentials were given.
+    await page.goto(req.url, { waitUntil: "domcontentloaded", timeout: 20000 });
+    await dismissConsentBanner(page, log);
     if (req.credentials.mode !== "none") {
-      await page.goto(req.url, { waitUntil: "domcontentloaded", timeout: 20000 });
-      await handleAuth(page, req, emit, log);
+      const creds = await performAuth(page, req.credentials, emit, log, { strict: false, agent: "mapper" });
+      await dismissConsentBanner(page, log); // the app may show its own banner after login
+      // Signed in: map the landing/dashboard we ended up on first, so the planner
+      // sees the real product rather than the public marketing page.
+      if (creds) main.unshift(page.url());
     }
 
-    while (queue.length > 0 && count < MAX_PAGES && Date.now() < deadline) {
-      const url = queue.shift()!;
+    while (count < MAX_PAGES && Date.now() < deadline) {
+      let url: string;
+      let fromLow = false;
+      if (main.length > 0) {
+        url = main.shift()!;
+      } else if (low.length > 0 && lowCount < MAX_LOW_PRIORITY) {
+        url = low.shift()!;
+        fromLow = true;
+      } else {
+        break;
+      }
       const key = normalize(url);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -248,14 +238,21 @@ export async function runMap(req: MapRequest, emit: Emitter, log: Logger): Promi
         continue;
       }
       await page.waitForTimeout(700);
-      // A redirect can land on a different URL; mark that one seen too so we do
-      // not re-crawl it when a link points at the post-redirect address.
-      seen.add(normalize(page.url()));
+      // A redirect can land on a page that was already mapped (e.g. several
+      // URLs all redirect to /app once signed in). Skip it instead of
+      // extracting, screenshotting and uploading the same page again.
+      const landedKey = normalize(page.url());
+      if (landedKey !== key && seen.has(landedKey)) {
+        log.info(`skipping ${url}: redirected to already-mapped ${page.url()}`);
+        continue;
+      }
+      seen.add(landedKey);
 
       const info = await extractInfo(page);
       const shotId = await screenshot(page, emit);
       const current = page.url();
       count++;
+      if (fromLow) lowCount++;
 
       await emit.emit({
         kind: "event",
@@ -274,9 +271,7 @@ export async function runMap(req: MapRequest, emit: Emitter, log: Logger): Promi
       });
       log.info(`mapped page ${count}: ${current} (${info.elements.length} elements)`);
 
-      for (const link of info.links) {
-        if (link.startsWith(origin) && !seen.has(normalize(link))) queue.push(link);
-      }
+      for (const link of info.links) enqueue(link);
     }
     await emit.emit({ kind: "mapDone", pageCount: count });
     log.info(`map done: ${count} pages`);

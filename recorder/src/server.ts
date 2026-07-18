@@ -73,12 +73,16 @@ async function recordJob(req: RecordRequest): Promise<void> {
 }
 
 const server = http.createServer(async (req, res) => {
-  if (req.method === "GET" && req.url === "/healthz") {
+  // Route on the pathname only — callers append ?runId=<id> for the Worker's
+  // per-run container routing, and that query string reaches us untouched.
+  const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+
+  if (req.method === "GET" && pathname === "/healthz") {
     send(res, 200, { ok: true });
     return;
   }
 
-  if (req.method === "POST" && (req.url === "/map" || req.url === "/record")) {
+  if (req.method === "POST" && (pathname === "/map" || pathname === "/record")) {
     const token = requireEnv("RECORDER_SERVICE_TOKEN");
     if (req.headers.authorization !== `Bearer ${token}`) {
       send(res, 401, { error: "unauthorized" });
@@ -92,7 +96,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (req.url === "/map") {
+    if (pathname === "/map") {
       const r = MapRequest.safeParse(parsed);
       if (!r.success) {
         send(res, 400, { error: "invalid /map body", issues: r.error.issues });

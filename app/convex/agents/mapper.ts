@@ -36,7 +36,10 @@ export const run = internalAction({
         url: args.url,
       });
 
-      const res = await fetch(`${recorderUrl}/map`, {
+      // runId in the query string: the recorder Worker routes on it so a run's
+      // /map and /record land on the same container instance (body isn't read
+      // by the Worker's router).
+      const res = await fetch(`${recorderUrl}/map?runId=${args.runId}`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${serviceToken}` },
         body: JSON.stringify({

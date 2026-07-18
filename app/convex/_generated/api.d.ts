@@ -11,6 +11,7 @@
 import type * as agents_director from "../agents/director.js";
 import type * as agents_mapper from "../agents/mapper.js";
 import type * as agents_scout from "../agents/scout.js";
+import type * as frames from "../frames.js";
 import type * as http from "../http.js";
 import type * as lib_aiRetry from "../lib/aiRetry.js";
 import type * as lib_cors from "../lib/cors.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   "agents/director": typeof agents_director;
   "agents/mapper": typeof agents_mapper;
   "agents/scout": typeof agents_scout;
+  frames: typeof frames;
   http: typeof http;
   "lib/aiRetry": typeof lib_aiRetry;
   "lib/cors": typeof lib_cors;

@@ -27,11 +27,21 @@ function oneOfToAnyOf(node: unknown): unknown {
   return node;
 }
 
-const storyboardModelSchema = jsonSchema<Storyboard>(
-  oneOfToAnyOf(z.toJSONSchema(Storyboard)) as Parameters<typeof jsonSchema>[0],
+// The Director now decides whether the run can even be filmed: if the product
+// is behind a sign-in and no credentials were given, it returns
+// needsCredentials=true and a null storyboard instead of a bogus docs video.
+const DirectorDecision = z.object({
+  needsCredentials: z.boolean(),
+  reason: z.string(),
+  storyboard: Storyboard.nullable(),
+});
+type DirectorDecision = z.infer<typeof DirectorDecision>;
+
+const directorDecisionModelSchema = jsonSchema<DirectorDecision>(
+  oneOfToAnyOf(z.toJSONSchema(DirectorDecision)) as Parameters<typeof jsonSchema>[0],
   {
     validate: (value) => {
-      const parsed = Storyboard.safeParse(value);
+      const parsed = DirectorDecision.safeParse(value);
       return parsed.success ? { success: true, value: parsed.data } : { success: false, error: parsed.error };
     },
   },
@@ -58,10 +68,10 @@ export const run = internalAction({
 
       const sceneRange = LENGTH_TO_SCENES[run.options.length];
 
-      const storyboard = await withOneRetry(async (retryNote) => {
+      const decision = await withOneRetry(async (retryNote) => {
         const { object } = await generateObject({
           model: openai("gpt-5.6-sol"),
-          schema: storyboardModelSchema,
+          schema: directorDecisionModelSchema,
           providerOptions: { openai: { reasoningEffort: "high" } },
           prompt:
             directorPrompt({
@@ -73,13 +83,34 @@ export const run = internalAction({
               sceneRange,
             }) + retryNote,
         });
-        if (object.scenes.length < sceneRange.min || object.scenes.length > sceneRange.max) {
-          throw new Error(
-            `expected ${sceneRange.min}-${sceneRange.max} scenes for length "${run.options.length}", got ${object.scenes.length}`,
-          );
+        if (!object.needsCredentials && object.storyboard === null) {
+          throw new Error("needsCredentials is false but storyboard is null");
+        }
+        if (object.storyboard) {
+          const count = object.storyboard.scenes.length;
+          if (count < sceneRange.min || count > sceneRange.max) {
+            throw new Error(
+              `expected ${sceneRange.min}-${sceneRange.max} scenes for length "${run.options.length}", got ${count}`,
+            );
+          }
         }
         return object;
       });
+
+      // The product is behind a sign-in and no credentials were provided:
+      // stop here without spending a credit and ask the user to start over
+      // with test credentials. If credentials WERE provided, the Director
+      // asking for them is a bug — fail loudly.
+      if (decision.needsCredentials) {
+        if (run.options.credentials.mode === "none") {
+          await ctx.runMutation(internal.runs.markNeedsCredentials, { runId, reason: decision.reason });
+          return null;
+        }
+        throw new Error(`director requested credentials although credentials were provided: ${decision.reason}`);
+      }
+
+      const storyboard = decision.storyboard;
+      if (!storyboard) throw new Error("director returned needsCredentials=false without a storyboard");
 
       await ctx.runMutation(internal.storyboards.save, { runId, data: storyboard });
       await ctx.runMutation(internal.lib.events.append, {
@@ -96,7 +127,17 @@ export const run = internalAction({
       const siteUrl = process.env.CONVEX_SITE_URL;
       if (!siteUrl) throw new Error("CONVEX_SITE_URL is not set");
 
-      const res = await fetch(`${recorderUrl}/record`, {
+      // If the Mapper already created a signup account, recording must reuse
+      // that exact account — signing up again would make a second account and
+      // land on empty state — so send login credentials, not the original
+      // signup request.
+      const recordCredentials = run.credentialsUsed
+        ? { mode: "login" as const, email: run.credentialsUsed.email, password: run.credentialsUsed.password }
+        : run.options.credentials;
+
+      // Same-instance routing as the mapper's /map call: the Worker routes on
+      // the runId query param, not the body.
+      const res = await fetch(`${recorderUrl}/record?runId=${runId}`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${serviceToken}` },
         body: JSON.stringify({
@@ -105,7 +146,7 @@ export const run = internalAction({
           runToken,
           storyboard,
           options: { voice: run.options.voice, zoom: run.options.zoom, captions: run.options.captions },
-          credentials: run.options.credentials,
+          credentials: recordCredentials,
         }),
       });
       if (!res.ok) throw new Error(`recorder /record failed: ${res.status} ${await res.text()}`);

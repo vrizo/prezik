@@ -20,7 +20,10 @@
           // Build context = repo root so the file:../shared dependency is present.
           "image_build_context": "..",
           "instance_type": "standard-2",
-          "max_instances": 3
+          // Per-run instance routing (?runId=) means each run holds one
+          // instance until it sleeps (20m); 3 was too tight once idle
+          // instances from recent runs count against the cap.
+          "max_instances": 8
         }
       ],
       "durable_objects": {

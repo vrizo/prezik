@@ -2,30 +2,51 @@ import type { PageElement, RunOptions, SitePage } from "@prezik/shared";
 
 // Director prompt.
 // Changelog:
+// v5 — beat-driven scenes: 2–3 highlight/zoom beats per scene spread across
+//      the narration by the recorder, narration order must match beat order;
+//      chained zooms pan element-to-element without zooming out; cut
+//      low-value scenes entirely.
+// v4 — pacing: scene actions must fit the narration (one goto max, no long
+//      waits) so the video has no long silent stretches; zooms keep context
+//      via generous padding.
+// v3 — product-first: live app screens over docs, needsCredentials escape
+//      hatch, one-short-sentence narration, no login scenes (recorder signs
+//      in off-camera), fast highlight-to-highlight pacing.
 // v2 — pages now carry a harvested elements list (selector + label + kind).
 //      Selectors must be copied verbatim from the elements of the scene's
 //      current page; prefer click/highlight/zoom on real elements over
 //      goto-only scenes. v1's "goto and narrate if unsure" fallback is gone.
 // v1 — initial version: factual narration rules, scene structure, scene
 //      counts from LENGTH_TO_SCENES.
-export const DIRECTOR_PROMPT_VERSION = 2;
+export const DIRECTOR_PROMPT_VERSION = 5;
 
 // The fixed instructional text for this version, stored verbatim in the
 // `prompts` table by seed.ts. The dynamic sections (brief, pages, options,
 // guidance, credentials) are appended at call time by directorPrompt().
 export const DIRECTOR_PROMPT_TEXT = `You are Director, the storyboard writer for a narrated product demo video.
 
+Your output is an object with fields needsCredentials (boolean), reason (string), and storyboard (object or null).
+
+Demo the product, not the docs:
+- The video must show the live product — the screens a user actually works in. Documentation, blog, terms, privacy and other marketing/legal subpages are not the product.
+- At most ONE scene in the whole video may use a documentation page, and only when a key feature cannot be shown live; its narration must present it as documentation. Never use terms/privacy/legal/blog pages at all.
+- If the credentials section below says mode "none" and the mapped pages contain no real product screens because the app is behind a sign-in, set needsCredentials=true, write a one-sentence reason, and set storyboard=null. Otherwise needsCredentials must be false with storyboard filled.
+
 Narration rules:
 - Narration is spoken word for word by a text-to-speech voice. Write only what should be spoken — no stage directions, no brackets, no scene labels.
 - State only facts visible in the brief or the mapped pages given below. Never invent features, numbers, or claims. At most one enthusiastic/hype adjective in the entire video.
-- Every scene covers exactly one idea.
-- Keep narration to about 2 sentences per scene.
+- Every scene covers exactly one idea. Its narration is one or two short sentences, roughly 8–22 words total — a few words per visual beat, so the voice talks continuously while the camera moves. No filler, no storytelling.
+- Intro and outro narration are one short phrase each, under 8 words.
 
 Scene structure:
-- The first scene opens on the landing page (or performs signup/login if instructed below). The last scene shows the single most impressive real feature found in the mapped pages — the "wow" moment.
-- A scene that shows a feature must highlight or zoom the element that embodies that feature, so the viewer sees exactly what the narration is talking about.
-- Prefer scenes that interact — click, highlight, zoom on real elements — over scenes that only navigate. A goto-only scene is a last resort for pages with no useful elements.
-- Use "highlight" before "zoom" when drawing attention to an element, and "zoomOut" before moving to a new area of the page.
+- Fast pace: several short scenes beat one long one. Never linger on a page to tell a story, and cut scenes that show nothing new — never show sign-in/sign-up pages, loading or empty states, or a second scene on a page already covered unless it demonstrates a different feature.
+- The first scene opens on the landing page with one quick highlight, then the next scenes jump straight into the product screens. When credentials exist the recorder signs in before the camera starts, so app pages are already logged in.
+- Each scene has 2–3 visual beats: highlight or zoom actions on the elements the narration talks about. The recorder spreads the beats evenly across the spoken narration, so write the narration to mention things in EXACTLY the order they are highlighted — the viewer must see each element at the moment the voice describes it.
+- Chained zooms pan smoothly from one element to the next without zooming out first. When two elements are in the same area of a page, zoom from one directly to the other. Use "zoomOut" only before a goto or when jumping to a distant part of the page. Use "highlight" before "zoom" when drawing attention to an element.
+- If a scene starts with a goto, the recorder navigates and waits for the page to finish loading BEFORE the narration starts — never add "wait" actions to let a page load.
+- A scene's actions must fit its narration: at most one goto (as the first action) plus its 2–3 beats, so the video never freezes while the voice talks or falls silent while actions run.
+- Zoom with generous padding (paddingPx 120 or more) so the element keeps its heading and nearby labels in frame — a zoom that crops away context is worse than no zoom.
+- The last scene shows the single most impressive real product feature — the "wow" moment.
 
 Selector rules:
 - Each mapped page below lists its elements: selector, visible label, and kind (link/button/input/heading/other). These are the ONLY selectors that exist.
@@ -75,10 +96,10 @@ function formatElement(e: PageElement): string {
 
 function describeCredentials(credentials: RunOptions["credentials"]): string {
   if (credentials.mode === "signup") {
-    return `Credentials: the recorder will sign up for a new account using the literal placeholders {{email}} and {{password}} inside "fill" action values. Make the FIRST scene perform this signup — use the signup page's input element selectors from its elements list, fill email and password with the placeholders, then click its submit element — before showing anything else.`;
+    return `Credentials: the recorder will create a fresh account and sign in BEFORE recording starts — off camera. Never write scenes that show or fill signup/login forms. Plan scenes on signed-in app pages as already logged in.`;
   }
   if (credentials.mode === "login") {
-    return `Credentials: the recorder will log in using the literal placeholders {{email}} and {{password}} inside "fill" action values. Make the FIRST scene log in — use the login page's input element selectors from its elements list, fill both fields with the placeholders, then click its submit element — before showing anything else.`;
+    return `Credentials: the recorder will log in BEFORE recording starts — off camera. Never write scenes that show or fill signup/login forms. Plan scenes on signed-in app pages as already logged in.`;
   }
-  return `Credentials: none. Do not attempt to sign up or log in; only show what is visible without an account.`;
+  return `Credentials: none. If the mapped pages show the real product is behind a sign-in (only landing/marketing/docs/legal pages were mapped), set needsCredentials=true instead of writing a storyboard. Only when the product is genuinely usable without an account, write the storyboard from what is visible.`;
 }

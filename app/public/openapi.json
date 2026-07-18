@@ -133,7 +133,7 @@
         "properties": {
           "_id": { "type": "string" },
           "url": { "type": "string" },
-          "status": { "type": "string", "enum": ["created", "exploring", "planning", "recording", "uploading", "done", "failed"] },
+          "status": { "type": "string", "enum": ["created", "exploring", "planning", "needs_credentials", "recording", "uploading", "done", "failed"] },
           "options": { "$ref": "#/components/schemas/RunOptions" },
           "brief": { "type": "string" },
           "guidance": { "type": "string" },

@@ -22,6 +22,7 @@ export default defineSchema({
     options: runOptionsValidator,
     status: runStatusValidator,
     brief: v.optional(v.string()),
+    needsCredentialsReason: v.optional(v.string()),
     credentialsUsed: v.optional(v.object({ email: v.string(), password: v.string() })),
     playbackUrl: v.optional(v.string()),
     captionsUrl: v.optional(v.string()),

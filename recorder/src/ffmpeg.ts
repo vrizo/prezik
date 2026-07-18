@@ -51,8 +51,10 @@ export interface AudioPlacement {
 // Assemble the screencast JPEG frames (an ffconcat playlist with per-frame
 // durations, i.e. variable frame rate from the CDP timestamps) into h264
 // CRF 18 yuv420p + faststart, muxing narration clips at their measured offsets
-// (adelay + amix, no normalization). ffmpeg does assembly and muxing only —
-// zooms happen in-page.
+// (adelay + amix, no normalization). The fps filter converts the VFR input to
+// constant 30 fps (duplicated frames during static stretches are nearly free
+// at encode time, and CFR plays back smoother than VFR in players/editors).
+// ffmpeg does assembly and muxing only — zooms happen in-page.
 export async function assembleAndMux(
   concatPath: string,
   audio: AudioPlacement[],
@@ -62,7 +64,7 @@ export async function assembleAndMux(
   const args = ["-y", "-f", "concat", "-safe", "0", "-i", concatPath];
   for (const a of audio) args.push("-i", a.path);
 
-  const videoChain = "[0:v]scale=1920:1080,setsar=1,format=yuv420p[vout]";
+  const videoChain = "[0:v]fps=30,scale=1920:1080,setsar=1,format=yuv420p[vout]";
   if (audio.length > 0) {
     const filters: string[] = [videoChain];
     const labels: string[] = [];
@@ -85,7 +87,9 @@ export async function assembleAndMux(
   args.push(
     "-c:v", "libx264",
     "-crf", "18",
-    "-fps_mode", "vfr",
+    // veryfast cuts encode time 2-4x on container CPUs at this CRF for a
+    // barely visible quality difference (somewhat larger file).
+    "-preset", "veryfast",
     "-movflags", "+faststart",
     outPath,
   );

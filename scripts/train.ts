@@ -8,7 +8,7 @@
 // proposals for a coding agent to act on.
 //
 // Usage:
-//   npx tsx scripts/train.ts --site <url> [--base <url>] [--runs N] [--signup <emailDomain>]
+//   npx tsx scripts/train.ts --site <url> [--base <url>] [--runs N] [--signup <emailDomain> | --email <e> --password <p>]
 //
 // No hidden fallbacks: every failure (run failed, timed out, malformed judge
 // output) is written to the report and the process exits non-zero.
@@ -39,12 +39,16 @@ const FFPROBE = "/opt/homebrew/bin/ffprobe";
 const FRAME_COUNT = 6;
 const JUDGE_MODEL = "gpt-5.6-sol"; // docs/agents/models.md — training-loop judge
 
-const USAGE = `Usage: npx tsx scripts/train.ts --site <url> [--base <url>] [--runs N] [--signup <emailDomain>]
+const USAGE = `Usage: npx tsx scripts/train.ts --site <url> [--base <url>] [--runs N] [--signup <emailDomain> | --email <e> --password <p>]
 
   --site      required. Target web app to run the Prezik pipeline against.
   --base      Convex HTTP actions URL. Default: ${DEFAULT_BASE}
   --runs      how many times to repeat, sequentially, each with a fresh session. Default: 1
-  --signup    if set, requests credentials.mode "signup" with this email domain (default: mode "none")`;
+  --signup    if set, requests credentials.mode "signup" with this email domain (default: mode "none")
+  --email     with --password, requests credentials.mode "login" using these test credentials
+  --password  with --email, the password for the test login (both are required together)
+
+  --signup and --email/--password are mutually exclusive.`;
 
 // ---------------------------------------------------------------------------
 // Judge output schema (step 5)
@@ -88,6 +92,7 @@ interface RunDoc {
   captionsUrl?: string;
   durationSec?: number;
   error?: string;
+  needsCredentialsReason?: string;
 }
 
 interface RunEventDoc extends RunEvent {
@@ -104,13 +109,20 @@ type IterationResult =
       framePaths: string[];
       vttPath?: string;
     }
-  | { kind: "failed"; runId?: string; reason: string; run?: RunDoc };
+  | { kind: "failed"; runId?: string; reason: string; run?: RunDoc }
+  | { kind: "needs_credentials"; runId: string; run: RunDoc; reason: string };
 
 // ---------------------------------------------------------------------------
 // CLI + env
 // ---------------------------------------------------------------------------
 
-function parseArgs(argv: string[]): { site: string; base: string; runs: number; signupDomain?: string } {
+function parseArgs(argv: string[]): {
+  site: string;
+  base: string;
+  runs: number;
+  signupDomain?: string;
+  login?: { email: string; password: string };
+} {
   const flags: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -126,11 +138,22 @@ function parseArgs(argv: string[]): { site: string; base: string; runs: number; 
   if (!Number.isInteger(runs) || runs < 1) {
     throw new Error(`--runs must be a positive integer, got "${flags.runs}"\n\n${USAGE}`);
   }
+
+  // --email and --password are all-or-nothing, and can't be combined with --signup.
+  if ((flags.email === undefined) !== (flags.password === undefined)) {
+    throw new Error(`--email and --password must be given together\n\n${USAGE}`);
+  }
+  const login = flags.email !== undefined ? { email: flags.email, password: flags.password } : undefined;
+  if (login && flags.signup !== undefined) {
+    throw new Error(`--signup and --email/--password are mutually exclusive\n\n${USAGE}`);
+  }
+
   return {
     site: flags.site,
     base: (flags.base ?? DEFAULT_BASE).replace(/\/+$/, ""),
     runs,
     signupDomain: flags.signup,
+    login,
   };
 }
 
@@ -213,13 +236,21 @@ function runTool(cmd: string, args: string[]): string {
 // Step 1: start a run, redeeming the hackathon coupon on a no-credits error
 // ---------------------------------------------------------------------------
 
-function buildRunOptions(signupDomain: string | undefined): RunOptions {
+function buildRunOptions(
+  signupDomain: string | undefined,
+  login: { email: string; password: string } | undefined,
+): RunOptions {
+  const credentials: RunOptions["credentials"] = login
+    ? { mode: "login", email: login.email, password: login.password }
+    : signupDomain
+      ? { mode: "signup", emailDomain: signupDomain }
+      : { mode: "none" };
   return {
     voice: "neutral",
     zoom: true,
     length: "short",
     captions: true,
-    credentials: signupDomain ? { mode: "signup", emailDomain: signupDomain } : { mode: "none" },
+    credentials,
   };
 }
 
@@ -290,7 +321,7 @@ async function pollRun(base: string, runId: string, log: DualLogger, tag: string
     if (res.status !== 200) throw new Error(`GET /api/runs/${runId} failed (${res.status}): ${describeApiError(res)}`);
     const run = res.body as RunDoc;
 
-    if (run.status === "done" || run.status === "failed") {
+    if (run.status === "done" || run.status === "failed" || run.status === "needs_credentials") {
       await pullEvents(); // catch anything written between the two requests above
       return { run, events };
     }
@@ -505,8 +536,16 @@ async function trainOnce(params: {
     if (run.status === "failed") {
       return { kind: "failed", runId: run._id, run, reason: run.error ?? 'run status is "failed" but no error message was recorded' };
     }
+    if (run.status === "needs_credentials") {
+      return {
+        kind: "needs_credentials",
+        runId: run._id,
+        run,
+        reason: run.needsCredentialsReason ?? "the site requires sign-in and no credentials were provided",
+      };
+    }
     if (run.status !== "done") {
-      // pollRun only returns on "done"/"failed", or throws on timeout.
+      // pollRun only returns on "done"/"failed"/"needs_credentials", or throws on timeout.
       throw new Error(`unexpected terminal run status "${run.status}"`);
     }
 
@@ -555,6 +594,14 @@ function writeReport(
       lines.push(r.reason);
       lines.push("");
       lines.push("Full agent log: logs/current/training.log");
+      lines.push("");
+      return;
+    }
+
+    if (r.kind === "needs_credentials") {
+      lines.push("Result: NEEDS CREDENTIALS");
+      lines.push("");
+      lines.push(`${r.reason} — rerun with --email/--password (or --signup) to record this product.`);
       lines.push("");
       return;
     }
@@ -608,11 +655,14 @@ async function main(): Promise<void> {
   const runDir = initRunDir(LOGS_ROOT);
   const log = makeDualLogger(fileLogger);
 
-  log.info(
-    `training loop: site=${argv.site} base=${argv.base} runs=${argv.runs}${argv.signupDomain ? ` signup=${argv.signupDomain}` : ""}`,
-  );
+  const credentialsTag = argv.login
+    ? ` login=${argv.login.email}`
+    : argv.signupDomain
+      ? ` signup=${argv.signupDomain}`
+      : "";
+  log.info(`training loop: site=${argv.site} base=${argv.base} runs=${argv.runs}${credentialsTag}`);
 
-  const options = buildRunOptions(argv.signupDomain);
+  const options = buildRunOptions(argv.signupDomain, argv.login);
   const results: IterationResult[] = [];
 
   for (let i = 1; i <= argv.runs; i++) {

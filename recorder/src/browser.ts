@@ -1,8 +1,58 @@
 import type { Page } from "playwright";
+import {
+  computeChainedZoom,
+  computeFirstZoom,
+  visualPointToLayout,
+  visualRectToLayout,
+  type ZoomState,
+} from "./zoomMath.js";
 
 // Browser-side helpers: a fake cursor, a highlight overlay, an in-page zoom, and
 // the intro/outro title card. Everything here is captured by Playwright's
 // recordVideo because it happens in the real page.
+
+// Per-page zoom state kept on the Node side (not only in the page) so all the
+// geometry lives in the pure, testable functions of zoomMath.ts instead of being
+// duplicated inside evaluate callbacks. Absent from the map = no zoom active.
+const zoomStates = new WeakMap<Page, ZoomState>();
+
+// Pages whose framenavigated listener has already been attached.
+const hookedPages = new WeakSet<Page>();
+
+// A goto lands on a fresh document with no transform (and the page-side saved
+// styles are gone with it), so drop any Node-side zoom state on main-frame
+// navigation. Attached lazily, exactly once per page. Explicit — no silent
+// try/catch recovery elsewhere depends on it.
+function ensurePageHooks(page: Page): void {
+  if (hookedPages.has(page)) return;
+  hookedPages.add(page);
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) zoomStates.delete(page);
+  });
+}
+
+// One round-trip that both proves the selector exists (throws otherwise — no
+// fallback) and returns its visual viewport rect plus the current viewport, the
+// inputs zoomMath needs. `notFound` names the caller for a useful error.
+async function measureTarget(page: Page, selector: string, notFound: string) {
+  return page.evaluate(
+    ({ sel, err }) => {
+      const el = document.querySelector(sel);
+      if (!el) throw new Error(err + sel);
+      const r = el.getBoundingClientRect();
+      return {
+        rect: { x: r.left, y: r.top, width: r.width, height: r.height },
+        vp: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          scrollX: window.scrollX,
+          scrollY: window.scrollY,
+        },
+      };
+    },
+    { sel: selector, err: notFound },
+  );
+}
 
 // tsx (esbuild keepNames) wraps nested named functions in __name(...) helper
 // calls; when Playwright serializes an evaluate callback into the page that
@@ -39,12 +89,29 @@ export function cursorInitScript(): string {
 
 // Glide the fake cursor to an element's center and wait for the transition.
 export async function moveCursorToSelector(page: Page, selector: string): Promise<void> {
+  ensurePageHooks(page);
+  const state = zoomStates.get(page);
   const loc = page.locator(selector).first();
-  await loc.scrollIntoViewIfNeeded({ timeout: 8000 }).catch(() => {});
+  // scrollIntoViewIfNeeded would fight the active transform; a chained pan already
+  // reaches off-screen elements, so skip it while zoomed.
+  if (!state) await loc.scrollIntoViewIfNeeded({ timeout: 8000 }).catch(() => {});
   const box = await loc.boundingBox();
   if (!box) return;
-  const x = box.x + box.width / 2;
-  const y = box.y + box.height / 2;
+  let x = box.x + box.width / 2;
+  let y = box.y + box.height / 2;
+  if (state) {
+    // boundingBox is visual (post-transform); the cursor div is fixed inside the
+    // transformed root, so its translate is interpreted in layout coords — convert.
+    const vp = await page.evaluate(() => ({
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollX: window.scrollX,
+      scrollY: window.scrollY,
+    }));
+    const p = visualPointToLayout(x, y, state, vp);
+    x = p.x;
+    y = p.y;
+  }
   await page.evaluate(([px, py]) => (window as any).__prezikMoveCursor?.(px, py), [x, y]);
   await page.waitForTimeout(300);
 }
@@ -52,21 +119,48 @@ export async function moveCursorToSelector(page: Page, selector: string): Promis
 // Spotlight a target: orange rounded outline plus a large dim shadow over the
 // rest of the page. Removes any previous highlight so dims do not stack.
 export async function highlightSelector(page: Page, selector: string): Promise<void> {
-  await page.evaluate((sel) => {
+  ensurePageHooks(page);
+  const state = zoomStates.get(page);
+  const { rect, vp } = await measureTarget(page, selector, "highlight target not found: ");
+
+  const pad = 6;
+  const borderPx = 3;
+  // The overlay is position:fixed inside <html>. While zoomed <html> is
+  // transformed, so the overlay's containing block is the (transformed) html box
+  // and its coords are read in LAYOUT space then transformed with the page —
+  // place it at the element's layout rect and it tracks the zoom exactly. Divide
+  // pad/border by scale so they still render at their intended pixel size. With
+  // no zoom active the visual rect is the layout rect, so use it directly.
+  const box = state
+    ? (() => {
+        const l = visualRectToLayout(rect, state, vp);
+        const p = pad / state.scale;
+        return {
+          left: l.x - p,
+          top: l.y - p,
+          width: l.width + 2 * p,
+          height: l.height + 2 * p,
+          border: borderPx / state.scale,
+        };
+      })()
+    : {
+        left: rect.x - pad,
+        top: rect.y - pad,
+        width: rect.width + 2 * pad,
+        height: rect.height + 2 * pad,
+        border: borderPx,
+      };
+
+  await page.evaluate((b) => {
     document.querySelectorAll(".__prezik_highlight__").forEach((n) => n.remove());
-    const el = document.querySelector(sel);
-    if (!el) throw new Error("highlight target not found: " + sel);
-    const r = el.getBoundingClientRect();
-    const pad = 6;
     const d = document.createElement("div");
     d.className = "__prezik_highlight__";
     d.style.cssText =
-      "position:fixed;left:" + (r.left - pad) + "px;top:" + (r.top - pad) + "px;width:" +
-      (r.width + 2 * pad) + "px;height:" + (r.height + 2 * pad) +
-      "px;border:3px solid #E8590C;border-radius:8px;box-shadow:0 0 0 2000px rgba(15,15,20,.28);z-index:2147483645;pointer-events:none;opacity:0;transition:opacity 260ms ease;";
+      "position:fixed;left:" + b.left + "px;top:" + b.top + "px;width:" + b.width + "px;height:" +
+      b.height + "px;border:" + b.border + "px solid #E8590C;border-radius:8px;box-shadow:0 0 0 2000px rgba(15,15,20,.28);z-index:2147483645;pointer-events:none;opacity:0;transition:opacity 260ms ease;";
     document.body.appendChild(d);
     requestAnimationFrame(() => { d.style.opacity = "1"; });
-  }, selector);
+  }, box);
   await page.waitForTimeout(340);
 }
 
@@ -77,24 +171,27 @@ export async function highlightSelector(page: Page, selector: string): Promise<v
 // its own root transform). Implemented here rather than with playwright-zoom
 // (see recorder/README.md for why).
 export async function zoomToSelector(page: Page, selector: string, paddingPx: number): Promise<void> {
-  await page.evaluate((sel) => {
-    const el = document.querySelector(sel);
-    if (!el) throw new Error("zoom target not found: " + sel);
-    el.scrollIntoView({ block: "center", inline: "center" });
-  }, selector);
-  await page.waitForTimeout(320);
-  await page.evaluate(
-    ({ sel, pad }) => {
+  ensurePageHooks(page);
+  const state = zoomStates.get(page);
+
+  if (!state) {
+    // First zoom: bring the element to viewport center (current behavior), then
+    // scale <html> around the element center with a transition. Record the state
+    // so a later call can chain from it instead of zooming back out first.
+    await page.evaluate((sel) => {
       const el = document.querySelector(sel);
       if (!el) throw new Error("zoom target not found: " + sel);
-      const r = el.getBoundingClientRect();
-      const targetW = r.width + 2 * pad;
-      const targetH = r.height + 2 * pad;
-      const scale = Math.max(1, Math.min(window.innerWidth / Math.max(targetW, 1), window.innerHeight / Math.max(targetH, 1), 3));
-      const originX = r.left + window.scrollX + r.width / 2;
-      const originY = r.top + window.scrollY + r.height / 2;
+      el.scrollIntoView({ block: "center", inline: "center" });
+    }, selector);
+    await page.waitForTimeout(320);
+
+    const { rect, vp } = await measureTarget(page, selector, "zoom target not found: ");
+    const next = computeFirstZoom(rect, vp, paddingPx);
+    await page.evaluate((z) => {
       const de = document.documentElement;
-      const w = window as unknown as { __prezikZoomSaved?: { transform: string; transition: string; transformOrigin: string } };
+      const w = window as unknown as {
+        __prezikZoomSaved?: { transform: string; transition: string; transformOrigin: string };
+      };
       if (!w.__prezikZoomSaved) {
         w.__prezikZoomSaved = {
           transform: de.style.transform,
@@ -102,12 +199,29 @@ export async function zoomToSelector(page: Page, selector: string, paddingPx: nu
           transformOrigin: de.style.transformOrigin,
         };
       }
-      de.style.transformOrigin = originX + "px " + originY + "px";
+      de.style.transformOrigin = z.originX + "px " + z.originY + "px";
       de.style.transition = "transform 600ms ease-in-out";
-      de.style.transform = "scale(" + scale + ")";
-    },
-    { sel: selector, pad: paddingPx },
-  );
+      de.style.transform = "translate(" + z.dx + "px," + z.dy + "px) scale(" + z.scale + ")";
+    }, next);
+    zoomStates.set(page, next);
+    await page.waitForTimeout(680);
+    return;
+  }
+
+  // Chained zoom: already zoomed. Do NOT scrollIntoView (it fights the transform);
+  // getBoundingClientRect works for off-viewport elements. Keep the origin fixed
+  // and pan/rescale via translate so the transition never passes through scale(1)
+  // (no full zoom-out flicker between elements).
+  const { rect, vp } = await measureTarget(page, selector, "zoom target not found: ");
+  const next = computeChainedZoom(rect, state, vp, paddingPx);
+  await page.evaluate((z) => {
+    const de = document.documentElement;
+    // transform-origin stays exactly as set at the first zoom — never move it
+    // mid-zoom, that would jump. Pan is entirely in the translate component.
+    de.style.transition = "transform 600ms ease-in-out";
+    de.style.transform = "translate(" + z.dx + "px," + z.dy + "px) scale(" + z.scale + ")";
+  }, next);
+  zoomStates.set(page, next);
   await page.waitForTimeout(680);
 }
 
@@ -116,6 +230,7 @@ export async function zoomToSelector(page: Page, selector: string, paddingPx: nu
 // restore fires on transitionend, with a 750ms cap for the case where the
 // animated value equals the current one and no transition event ever fires.
 export async function zoomOut(page: Page, log?: { info(msg: string): void }): Promise<void> {
+  ensurePageHooks(page);
   const didZoomOut = await page.evaluate(() => {
     const w = window as unknown as { __prezikZoomSaved?: { transform: string; transition: string; transformOrigin: string } };
     const saved = w.__prezikZoomSaved;
@@ -136,6 +251,8 @@ export async function zoomOut(page: Page, log?: { info(msg: string): void }): Pr
       de.style.transform = saved.transform || "none";
     });
   });
+  // Clear Node-side state regardless: after this the next zoom is a first zoom.
+  zoomStates.delete(page);
   if (!didZoomOut) log?.info("zoomOut: no active zoom, nothing to undo");
 }
 

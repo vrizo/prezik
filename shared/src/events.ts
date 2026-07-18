@@ -6,6 +6,7 @@ export const RunStatus = z.enum([
   "created",
   "exploring", // scout + mapper active
   "planning", // director active
+  "needs_credentials", // terminal for the run; the user must start a new run with credentials
   "recording", // recorder container active
   "uploading",
   "done",

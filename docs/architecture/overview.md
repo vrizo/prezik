@@ -13,4 +13,4 @@ The recorder is one Node service with two endpoints (/map and /record), deployed
 
 Storyboard contract: shared/src/storyboard.ts. Change it only together with recorder/ and the Director prompt.
 
-Status flow: created, exploring, planning, recording, uploading, done, failed. Errors are shown to the user as-is; no silent recovery.
+Status flow: created, exploring, planning, recording, uploading, done, failed. The Director can also end a run at needs_credentials — the product is behind a sign-in and no credentials were given, so the user must start a new run with test credentials. Errors are shown to the user as-is; no silent recovery.

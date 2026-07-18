@@ -154,6 +154,27 @@ export const markPlanning = internalMutation({
   },
 });
 
+// Director found the product is behind sign-in and no credentials were
+// given: stop the run here, terminally, so the UI can ask the user to start
+// over with test credentials. No credit is spent (the recorder never runs).
+export const markNeedsCredentials = internalMutation({
+  args: { runId: v.id("runs"), reason: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { runId, reason }) => {
+    const run = await ctx.db.get(runId);
+    if (!run) throw new Error("run not found");
+    if (run.status === "failed") return null;
+    await ctx.db.patch(runId, { status: "needs_credentials", needsCredentialsReason: reason });
+    await appendEventDb(ctx, {
+      runId,
+      agent: "director",
+      level: "info",
+      message: `this product requires sign-in — start a new run with test credentials (${reason})`,
+    });
+    return null;
+  },
+});
+
 // Status -> recording AND the credit reservation is spent here, exactly
 // once, only when the recorder has actually accepted the job.
 export const markRecording = internalMutation({
