@@ -25,13 +25,13 @@ type Props = {
 export function ErrorPanel({ run, events, step, onRetry }: Props) {
   const [copied, setCopied] = useState(false);
 
-  const path = pathOf(latestEventUrl(events)) || "the app";
+  const path = pathOf(latestEventUrl(events)) || "the\u00A0app";
   const errorEvents = events.filter((event) => event.level === "error");
 
   // Credits are consumed at markRecording (the moment recording starts), not at
   // create or on success. So a failure before recording never charged the run;
   // a failure during recording already did.
-  const chargeNote = step === "record" ? "we're on it" : "your run wasn't charged";
+  const chargeNote = step === "record" ? "we're on\u00A0it" : "your run wasn't charged";
 
   async function copyError() {
     await navigator.clipboard.writeText(run.error ?? "unknown error");
@@ -44,7 +44,7 @@ export function ErrorPanel({ run, events, step, onRetry }: Props) {
       <img src={errorPup} alt="" className="w-20 flex-none self-center" />
       <div className="flex-1">
         <h3 className="mb-1 text-[18px] font-bold text-[#a5301f]">
-          {STEP_GERUND[step]} stopped on {path}
+          {STEP_GERUND[step]} stopped on&nbsp;{path}
         </h3>
         <p className="mb-3 text-[14px] text-sub">
           {run.error ?? "The run stopped unexpectedly."} — {chargeNote}

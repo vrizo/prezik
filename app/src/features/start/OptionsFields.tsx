@@ -55,19 +55,8 @@ export function OptionsFields({ options, onChange }: Props) {
         <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-full bg-chip text-[12px] font-bold">
           1
         </span>
-        <span className="whitespace-nowrap text-[17px] font-bold">Personalise the demo</span>
+        <span className="whitespace-nowrap text-[17px] font-bold">Personalise the&nbsp;demo</span>
       </div>
-
-      {/* Mode — static, stores nothing */}
-      <Row label="Mode">
-        <div className="flex gap-2">
-          <span className="rounded-full bg-ink px-[15px] py-2 text-[13px] font-semibold text-white">Full demo</span>
-          <span className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-full border border-line px-[15px] py-2 text-[13px] font-semibold text-faint">
-            Specific feature
-            <span className="rounded-[5px] bg-chip px-1.5 py-px text-[10px] font-bold text-faint">soon</span>
-          </span>
-        </div>
-      </Row>
 
       {/* Voice */}
       <Row label="Voice">

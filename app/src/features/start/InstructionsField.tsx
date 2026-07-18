@@ -72,7 +72,7 @@ export function InstructionsField({ value, onChange }: Props) {
         <span className="whitespace-nowrap text-[17px] font-bold">Custom instructions</span>
       </div>
       <p className="m-0 mb-4 ml-[30px] text-[13px] text-sub">
-        Anything the agents should know — what to show, what to skip, how to sound
+        Anything the&nbsp;agents should know — what to&nbsp;show, what to&nbsp;skip, how to&nbsp;sound
       </p>
 
       <textarea
