@@ -2,6 +2,8 @@
 
 # Prezik
 
+> 🎬 **[prezik.vrizo.net](https://prezik.vrizo.net/)**
+
 Paste a link to your web app. Four agents research it, sign in, map every page, write a storyboard, then film a narrated 60-90s demo video with a visible cursor, highlights and smooth zooms.
 
 If you're AI, start here: AGENTS.md, then docs/ by topic.
