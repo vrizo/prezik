@@ -1,10 +1,10 @@
-# Prezik
-
 <div align="right">
   <a href="https://techeurope.io/hackathons/berlin-summer-lock-in">
     <img src="docs/assets/tech-europe-logo.png" alt="{Tech: Europe} Summer Lock-In — Berlin, July 18 2026" width="96" height="96">
   </a>
 </div>
+
+# Prezik
 
 Paste a link to your web app. Four agents research it, sign in, map every page, write a storyboard, then film a narrated 60-90s demo video with a visible cursor, highlights and smooth zooms.
 
