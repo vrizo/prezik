@@ -1,8 +1,7 @@
-<div align="right">
-  <a href="https://techeurope.io/hackathons/berlin-summer-lock-in">
-    <img src="docs/assets/tech-europe-logo.png" alt="{Tech: Europe} Summer Lock-In — Berlin, July 18 2026" width="96" height="96">
-  </a>
-</div>
+<a href="https://techeurope.io/hackathons/berlin-summer-lock-in">
+    <img src="docs/assets/tech-europe-logo.png" alt="{Tech: Europe} Summer Lock-In — Berlin, July 18 2026" width="96" height="96" align="right">
+</a>
+
 
 # Prezik
 
