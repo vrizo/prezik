@@ -1,5 +1,0 @@
-# The root .gitignore blocks all .env.* files (that rule exists to keep secrets
-# out of git). These two hold no secrets, only the default VITE_APP_URL per
-# Vite mode, and Vite needs them committed to build production/staging correctly.
-!.env.production
-!.env.staging

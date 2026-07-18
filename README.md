@@ -24,7 +24,6 @@ OrbStack and Node 24+ is required.
 cp .env.example .env
 cd app && npm install
 cd ../recorder && npm install
-cd ../landing && npm install
 cd .. && npm install
 cd app && npx convex login
 ```
@@ -83,7 +82,6 @@ cd recorder && npx wrangler deploy --env staging
 cd app && npx convex deploy
 cd app && npx wrangler deploy --env production
 cd recorder && npx wrangler deploy --env production
-cd landing && npm run build && npx wrangler deploy --env production
 ```
 
-Staging: present-staging.vrizo.net. Production: app.present.vrizo.net / present.vrizo.net. Full steps and secrets: docs/deploy/staging.md, docs/deploy/production.md.
+Staging: present-staging.vrizo.net. Production: prezik.vrizo.net. Full steps and secrets: docs/deploy/staging.md, docs/deploy/production.md.
