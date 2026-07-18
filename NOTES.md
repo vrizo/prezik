@@ -21,6 +21,9 @@ show transcript button at the end
 add human agent presenter
 ---
 tech-europe-hackathon
+
+vitalii.rizo+test1806@gmail.com
+eCZ-UWb-Lrp
 ---
 
 Custom instructions:
