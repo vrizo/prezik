@@ -5,7 +5,6 @@
 - length [slider from short to long] (short by default)
 - captions [toggle] (on by default)
 - format: vertical (tiktok) or horizontal [dropdown] (horizontal 16:9 by default)
-
 ---
 new option: style of highlights: hand drawn, strict frame
 ---
@@ -15,22 +14,13 @@ animated transitions of highlight frame
 ---
 motion blur?
 ---
-
----
-Improve the highlighting frame in the videos. It should appear and disappear with transition. The frame should be dark gray semi-transparent.
----
 - in the current version there is no way to edit plan or text, so it is generated ready-only.
----
-VIDEO RECORDING FIXES:
-- reduce resolution of the browser, because elements are too small. Keep full hd video at the end. Maybe you should scale the page instead.
 ---
 show transcript button at the end
 ---
-
----
 add human agent presenter
 ---
-
+tech-europe-hackathon
 ---
 
 Custom instructions:
