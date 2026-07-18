@@ -2,11 +2,11 @@
 
 What this is: paste a URL, four product agents (Scout, Mapper, Director, Presenter) research a web app, map it, plan a storyboard, and film a narrated demo video.
 
-Layout: landing/ (static page), app/ (Vite React SPA + convex/ backend), recorder/ (browser + video service, runs as a Cloudflare Container), shared/ (contracts: storyboard schema, event types, logger), docs/ (by topic), skills/, scripts/, logs/.
+Layout: app/ (Vite React SPA + convex/ backend), recorder/ (browser + video service, runs as a Cloudflare Container), shared/ (contracts: storyboard schema, event types, logger), docs/ (by topic), skills/, scripts/, logs/.
 
 Read the matching docs/ folder before working in an area. Docs are plain English, short, minimal markdown. Keep them that way.
 
-Environments. Staging: present-staging.vrizo.net + Convex staging deployment. Production: present.vrizo.net + Convex prod deployment. There is no local product environment. Deploy to staging any time without asking. Deploy to production only after the work is reviewed.
+Environments. Staging: present-staging.vrizo.net + Convex staging deployment. Production: prezik.vrizo.net + Convex prod deployment. There is no local product environment. Deploy to staging any time without asking. Deploy to production only after the work is reviewed.
 
 Rules:
 - Do not build or restyle end-user UI. The owner provides designs separately; existing screens are functional plumbing only.
