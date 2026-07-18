@@ -1,5 +1,7 @@
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
+import type { ActionCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { credentialsValidator } from "../lib/validators";
 import { errorMessage } from "../lib/errors";
@@ -36,6 +38,13 @@ export const run = internalAction({
         url: args.url,
       });
 
+      // Each run gets a fresh container instance (the Worker routes by runId),
+      // so the instance is always cold here. A straight POST /map can die with
+      // a connect/tunnel error while the container boots. Poll /healthz on the
+      // same runId first — the GET boots the instance and is harmless to
+      // retry — then POST /map exactly once.
+      await waitForRecorder(ctx, args.runId, recorderUrl);
+
       // runId in the query string: the recorder Worker routes on it so a run's
       // /map and /record land on the same container instance (body isn't read
       // by the Worker's router).
@@ -59,3 +68,32 @@ export const run = internalAction({
     }
   },
 });
+
+// Boot the run's container instance and wait until it answers. Retries only
+// cover the boot window; if the container still isn't up after the deadline,
+// the error propagates and fails the run.
+async function waitForRecorder(ctx: ActionCtx, runId: Id<"runs">, recorderUrl: string): Promise<void> {
+  const deadline = Date.now() + 120_000;
+  let lastError = "";
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(`${recorderUrl}/healthz?runId=${runId}`);
+      if (res.ok) return;
+      lastError = `recorder /healthz returned ${res.status}`;
+    } catch (err) {
+      lastError = errorMessage(err);
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(`recorder container did not come up within 120s: ${lastError}`);
+    }
+    if (attempt === 0) {
+      await ctx.runMutation(internal.lib.events.append, {
+        runId,
+        agent: "mapper",
+        level: "info",
+        message: "recorder container is booting — waiting for it to come up",
+      });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}

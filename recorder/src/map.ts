@@ -14,6 +14,21 @@ const MAX_MS = 3 * 60 * 1000;
 // docs/legal pages are near-useless for a product demo; a small sample is enough
 // for the planner, so at most this many low-priority pages are mapped per run.
 const MAX_LOW_PRIORITY = 2;
+// Let late-loading content (fonts, images, client-rendered widgets) settle after
+// domcontentloaded so screenshots don't capture half-rendered pages.
+const SCREENSHOT_SETTLE_MS = 2000;
+// Rate-limit handling: on HTTP 429 the crawl slows down (delay between page
+// loads, doubling per 429 up to the cap) and the page is re-queued for another
+// try instead of failing the run.
+const BACKOFF_INITIAL_MS = 2000;
+const BACKOFF_MAX_MS = 15000;
+const MAX_RETRIES_429 = 2;
+
+// Next politeness delay after a 429: start at the initial backoff, double per
+// hit, capped. Pure — unit-tested in test/map.test.ts.
+export function backoffDelayMs(currentMs: number): number {
+  return Math.min(Math.max(currentMs * 2, BACKOFF_INITIAL_MS), BACKOFF_MAX_MS);
+}
 
 // Dedupe key: origin + path, ignoring query and hash.
 function normalize(url: string): string {
@@ -161,7 +176,7 @@ export function isLowPriorityUrl(url: string): boolean {
   } catch {
     return false;
   }
-  return /\b(docs?|blog|privacy|terms|legal|policy|policies|changelog|cookies?)\b/i.test(pathname);
+  return /\b(docs?|blog|privacy|terms|legal|policy|policies|changelog|cookies?|impressum|imprint)\b/i.test(pathname);
 }
 
 export async function runMap(req: MapRequest, emit: Emitter, log: Logger): Promise<void> {
@@ -201,6 +216,9 @@ export async function runMap(req: MapRequest, emit: Emitter, log: Logger): Promi
   };
   let count = 0;
   let lowCount = 0;
+  // Politeness delay between page loads; 0 until the site rate-limits us.
+  let crawlDelayMs = 0;
+  const retries429 = new Map<string, number>();
 
   try {
     // Pre-crawl: dismiss any cookie banner once (consent persists for the whole
@@ -231,13 +249,38 @@ export async function runMap(req: MapRequest, emit: Emitter, log: Logger): Promi
       if (seen.has(key)) continue;
       seen.add(key);
 
+      if (crawlDelayMs > 0) await page.waitForTimeout(crawlDelayMs);
+      let response;
       try {
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+        response = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
       } catch (e) {
-        await emit.emit({ kind: "event", event: { agent: "mapper", level: "error", message: `failed to load ${url}: ${String(e)}`, url } });
+        await emit.emit({ kind: "event", event: { agent: "mapper", level: "error", message: `could not fetch ${url}: ${String(e)}`, url } });
         continue;
       }
-      await page.waitForTimeout(700);
+      // page.goto resolves on any HTTP status; an error page must not be mapped
+      // as if it were product content. 429 means we're crawling too fast: slow
+      // down and requeue the page for another attempt; other 4xx/5xx (and a
+      // 429 that keeps failing) become an error event and the crawl moves on.
+      const status = response?.status() ?? 200;
+      if (status === 429) {
+        crawlDelayMs = backoffDelayMs(crawlDelayMs);
+        const attempts = (retries429.get(key) ?? 0) + 1;
+        retries429.set(key, attempts);
+        if (attempts <= MAX_RETRIES_429) {
+          seen.delete(key);
+          (fromLow ? low : main).push(url);
+          log.info(`rate limited on ${url} (attempt ${attempts}); crawl delay now ${crawlDelayMs}ms`);
+          continue;
+        }
+        await emit.emit({ kind: "event", event: { agent: "mapper", level: "error", message: `could not fetch ${url}: 429`, url } });
+        continue;
+      }
+      if (status >= 400) {
+        await emit.emit({ kind: "event", event: { agent: "mapper", level: "error", message: `could not fetch ${url}: ${status}`, url } });
+        continue;
+      }
+      // Settle before extracting/screenshotting so the capture shows the real page.
+      await page.waitForTimeout(SCREENSHOT_SETTLE_MS);
       // A redirect can land on a page that was already mapped (e.g. several
       // URLs all redirect to /app once signed in). Skip it instead of
       // extracting, screenshotting and uploading the same page again.
@@ -273,6 +316,9 @@ export async function runMap(req: MapRequest, emit: Emitter, log: Logger): Promi
 
       for (const link of info.links) enqueue(link);
     }
+    // Per-page failures are tolerated above, but zero readable pages means the
+    // planner has nothing to work with — that IS critical, so fail the run.
+    if (count === 0) throw new Error("mapping failed: no pages could be read");
     await emit.emit({ kind: "mapDone", pageCount: count });
     log.info(`map done: ${count} pages`);
   } finally {

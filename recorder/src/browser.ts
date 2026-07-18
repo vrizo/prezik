@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { PREZIK_LOGO_DATA_URI } from "./logo.js";
 import {
   computeChainedZoom,
   computeFirstZoom,
@@ -116,8 +117,10 @@ export async function moveCursorToSelector(page: Page, selector: string): Promis
   await page.waitForTimeout(300);
 }
 
-// Spotlight a target: orange rounded outline plus a large dim shadow over the
-// rest of the page. Removes any previous highlight so dims do not stack.
+// Spotlight a target: a dark-gray semi-transparent rounded frame plus a large
+// dim shadow over the rest of the page. The frame fades in, holds, then fades
+// out on its own so it both appears and disappears with a smooth transition.
+// Removes any previous highlight so dims do not stack.
 export async function highlightSelector(page: Page, selector: string): Promise<void> {
   ensurePageHooks(page);
   const state = zoomStates.get(page);
@@ -151,17 +154,26 @@ export async function highlightSelector(page: Page, selector: string): Promise<v
         border: borderPx,
       };
 
+  const fadeMs = 300;
+  const holdMs = 1500;
   await page.evaluate((b) => {
     document.querySelectorAll(".__prezik_highlight__").forEach((n) => n.remove());
     const d = document.createElement("div");
     d.className = "__prezik_highlight__";
     d.style.cssText =
       "position:fixed;left:" + b.left + "px;top:" + b.top + "px;width:" + b.width + "px;height:" +
-      b.height + "px;border:" + b.border + "px solid #E8590C;border-radius:8px;box-shadow:0 0 0 2000px rgba(15,15,20,.28);z-index:2147483645;pointer-events:none;opacity:0;transition:opacity 260ms ease;";
+      b.height + "px;border:" + b.border + "px solid rgba(48,48,56,.6);border-radius:8px;box-shadow:0 0 0 2000px rgba(15,15,20,.28);z-index:2147483645;pointer-events:none;opacity:0;transition:opacity " + b.fadeMs + "ms ease;";
     document.body.appendChild(d);
     requestAnimationFrame(() => { d.style.opacity = "1"; });
-  }, box);
-  await page.waitForTimeout(340);
+    // Fade the frame back out after a hold so it disappears with a transition
+    // instead of vanishing abruptly when the scene ends or is replaced.
+    setTimeout(() => {
+      if (!d.isConnected) return;
+      d.style.opacity = "0";
+      setTimeout(() => d.remove(), b.fadeMs + 60);
+    }, b.holdMs);
+  }, { ...box, fadeMs, holdMs });
+  await page.waitForTimeout(fadeMs + 40);
 }
 
 // Animated in-page zoom into an element with padding (scale capped at 3).
@@ -268,4 +280,17 @@ export function titleCardHtml(productName: string, tagline: string): string {
   .name{font-size:104px;font-weight:800;letter-spacing:-2px;margin:0 48px;text-align:center;line-height:1.05;}
   .tag{font-size:40px;font-weight:400;color:#6B675E;margin-top:28px;text-align:center;max-width:1400px;padding:0 48px;}
   </style></head><body><div class="name">${esc(productName)}</div><div class="tag">${esc(tagline)}</div></body></html>`;
+}
+
+// Final end card: the Prezik logo (300px wide) centered on a white background
+// with the product link beneath it. Held for a fixed 2s at the very end of the
+// video. The logo is an inlined data URI (see logo.ts) so the card is fully
+// self-contained.
+export function endCardHtml(link: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  html,body{margin:0;height:100%;}
+  body{background:#FFFFFF;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}
+  img{width:300px;height:auto;display:block;}
+  .link{margin-top:28px;font-size:34px;font-weight:500;color:#3B3A36;letter-spacing:-0.5px;}
+  </style></head><body><img src="${PREZIK_LOGO_DATA_URI}" alt="Prezik"><div class="link">${esc(link)}</div></body></html>`;
 }

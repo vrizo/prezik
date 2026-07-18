@@ -16,6 +16,7 @@ import { buildVtt, type VttSegment } from "./vtt.js";
 import { beatStartOffsets, remainingWaitMs, SILENT_SEGMENT_MS } from "./timing.js";
 import {
   cursorInitScript,
+  endCardHtml,
   esbuildHelperInitScript,
   highlightSelector,
   moveCursorToSelector,
@@ -42,8 +43,13 @@ export interface RecordResult {
   captionsVtt?: string;
 }
 
+// Fixed hold for the closing logo card, in ms.
+const END_CARD_MS = 2000;
+// Product link shown beneath the logo on the closing card.
+const END_CARD_LINK = "present.vrizo.net";
+
 interface Segment {
-  kind: "intro" | "scene" | "outro";
+  kind: "intro" | "scene" | "outro" | "endcard";
   id: string;
   narration: string;
   audioPath: string | null;
@@ -316,6 +322,22 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
       // Outro title card.
       await runSegment("outro", "outro", job.storyboard.outro.narration, async () => {
         await page.setContent(titleCardHtml(job.storyboard.productName, job.storyboard.tagline), { waitUntil: "load" });
+      });
+
+      // Closing logo card: the Prezik logo + product link on white, held a fixed
+      // 2s. Silent (no narration/audio), so it runs outside runSegment. Pushed as
+      // a segment with audioMs=END_CARD_MS purely so silence compression treats
+      // its 2s as protected clip time and does not cut it down to MAX_SILENCE_GAP.
+      const endCardStart = Date.now();
+      await page.setContent(endCardHtml(END_CARD_LINK), { waitUntil: "load" });
+      await page.waitForTimeout(END_CARD_MS);
+      segments.push({
+        kind: "endcard",
+        id: "endcard",
+        narration: "",
+        audioPath: null,
+        audioMs: END_CARD_MS,
+        startEpochMs: endCardStart,
       });
     } finally {
       frames = await screencast.stop();

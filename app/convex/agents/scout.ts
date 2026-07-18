@@ -54,10 +54,37 @@ export const run = internalAction({
         url: run.url,
       });
 
-      const homepageRes = await fetch(run.url);
-      if (!homepageRes.ok) throw new Error(`could not fetch ${run.url}: ${homepageRes.status}`);
-      const html = await homepageRes.text();
-      const homepageText = stripTags(html).slice(0, 8000);
+      // Homepage fetch is best-effort: a rate limit or an unreachable page is
+      // non-critical (the search summary alone can still produce a brief), so
+      // it becomes an error event while the run continues. 429 gets a couple
+      // of backed-off retries before giving up.
+      let homepageText = "";
+      let fetchError: string | null = null;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const homepageRes = await fetch(run.url);
+          if (homepageRes.ok) {
+            homepageText = stripTags(await homepageRes.text()).slice(0, 8000);
+            fetchError = null;
+            break;
+          }
+          fetchError = `could not fetch ${run.url}: ${homepageRes.status}`;
+          if (homepageRes.status !== 429 || attempt >= 2) break;
+        } catch (fetchErr) {
+          fetchError = `could not fetch ${run.url}: ${errorMessage(fetchErr)}`;
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2000 * (attempt + 1)));
+      }
+      if (fetchError) {
+        await ctx.runMutation(internal.lib.events.append, {
+          runId,
+          agent: "scout",
+          level: "error",
+          message: fetchError,
+          url: run.url,
+        });
+      }
 
       const brief = await withOneRetry(async (retryNote) => {
         const { text } = await generateText({

@@ -2,6 +2,16 @@ import type { PageElement, RunOptions, SitePage } from "@prezik/shared";
 
 // Director prompt.
 // Changelog:
+// v7 — form completion: fill every required input (including ratings/
+//      pickers, via click) before any submit click; a submit button is
+//      commonly disabled until the form is valid and clicking a disabled
+//      button kills the recording. When unsure the form is complete, end
+//      the scene on the filled field instead of clicking submit.
+// v6 — feature-first ordering: right after the intro, demo the core workflow
+//      completed to a visible result; supporting features after, in
+//      decreasing importance. Replaces v5's "wow moment last" rule, which
+//      pushed the main feature to the end. Scenes must end on a visible
+//      outcome, not just point at controls.
 // v5 — beat-driven scenes: 2–3 highlight/zoom beats per scene spread across
 //      the narration by the recorder, narration order must match beat order;
 //      chained zooms pan element-to-element without zooming out; cut
@@ -18,7 +28,7 @@ import type { PageElement, RunOptions, SitePage } from "@prezik/shared";
 //      goto-only scenes. v1's "goto and narrate if unsure" fallback is gone.
 // v1 — initial version: factual narration rules, scene structure, scene
 //      counts from LENGTH_TO_SCENES.
-export const DIRECTOR_PROMPT_VERSION = 5;
+export const DIRECTOR_PROMPT_VERSION = 7;
 
 // The fixed instructional text for this version, stored verbatim in the
 // `prompts` table by seed.ts. The dynamic sections (brief, pages, options,
@@ -46,7 +56,12 @@ Scene structure:
 - If a scene starts with a goto, the recorder navigates and waits for the page to finish loading BEFORE the narration starts — never add "wait" actions to let a page load.
 - A scene's actions must fit its narration: at most one goto (as the first action) plus its 2–3 beats, so the video never freezes while the voice talks or falls silent while actions run.
 - Zoom with generous padding (paddingPx 120 or more) so the element keeps its heading and nearby labels in frame — a zoom that crops away context is worse than no zoom.
-- The last scene shows the single most impressive real product feature — the "wow" moment.
+
+Scene order and outcomes:
+- Order scenes by importance, main features first. The first scene AFTER the landing intro demonstrates the product's core workflow — the main thing a user comes to the product to do — and completes it to a visible result (a saved entry, a created item, a changed state on screen). Supporting features like history views, exports, settings or integrations come after, in decreasing importance. Never open with secondary features and save the core workflow for the end.
+- Every interactive scene ends on a visible outcome, not just a hover or a highlighted control: a filled field, a changed view, a created record. If an element's outcome cannot be shown (file downloads, emails), the narration names the element's purpose while it is highlighted, and the scene moves on.
+- If the brief names a distinguishing feature and it is demoable from the mapped pages, give it its own scene right after the core workflow.
+- Completing a form: fill or select EVERY required input first — text via "fill", ratings/pickers/toggles via "click" on their listed elements — and only then click save/submit. Submit buttons are typically disabled until the form is valid, and clicking a disabled button aborts the recording. If the listed elements do not clearly cover every required input, do NOT click submit — end the scene on the last filled field instead.
 
 Selector rules:
 - Each mapped page below lists its elements: selector, visible label, and kind (link/button/input/heading/other). These are the ONLY selectors that exist.
