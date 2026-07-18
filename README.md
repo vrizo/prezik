@@ -6,8 +6,7 @@
     <img src="docs/assets/tech-europe-logo.svg" alt="{Tech: Europe} Summer Lock-In — Berlin, July 18 2026" width="96" height="96" align="right">
 </a>
 
-
-# Prezik
+<br clear="all">
 
 > 🎬 **[prezik.vrizo.net](https://prezik.vrizo.net/)**
 
