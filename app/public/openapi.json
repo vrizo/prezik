@@ -1,0 +1,160 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Prezik public API",
+    "version": "0.1.0",
+    "description": "Paste a URL, get a narrated demo video. Everything the web UI does is available here. See docs/api/http.md in the repo for notes."
+  },
+  "paths": {
+    "/api/runs": {
+      "post": {
+        "summary": "Start a run",
+        "description": "Creates a session if sessionId is omitted, then starts the Scout/Mapper/Director/Presenter pipeline.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                  "url": { "type": "string", "description": "The web app to demo." },
+                  "options": { "$ref": "#/components/schemas/RunOptions" },
+                  "sessionId": { "type": "string", "description": "Reuse an existing session; omit to mint a new anonymous one." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Run started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runId": { "type": "string" },
+                    "sessionId": { "type": "string" },
+                    "runToken": { "type": "string", "description": "Bearer token for this run's recorder callbacks. Not needed by API clients." }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid body, or the session has no credits.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/runs/{id}": {
+      "get": {
+        "summary": "Get run status",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": {
+            "description": "The run, including current agent activity and — once status is \"done\" — playbackUrl, captionsUrl and durationSec.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Run" } } }
+          },
+          "404": { "description": "No such run.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    },
+    "/api/runs/{id}/events": {
+      "get": {
+        "summary": "Live agent feed",
+        "description": "Events after the given seq cursor, ascending. For polling clients — the web UI subscribes to the same data over Convex's live queries.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "after", "in": "query", "required": false, "schema": { "type": "integer" }, "description": "Only return events with seq greater than this." }
+        ],
+        "responses": {
+          "200": {
+            "description": "Events, oldest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "events": { "type": "array", "items": { "$ref": "#/components/schemas/RunEvent" } } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/coupon": {
+      "post": {
+        "summary": "Redeem a coupon",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "type": "object", "required": ["code"], "properties": { "code": { "type": "string" } } } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Coupon applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "credits": { "type": "number" }, "couponCode": { "type": "string" } }
+                }
+              }
+            }
+          },
+          "400": { "description": "Unknown or exhausted coupon code.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": { "type": "object", "properties": { "error": { "type": "string" } } },
+      "Credentials": {
+        "oneOf": [
+          { "type": "object", "properties": { "mode": { "const": "none" } } },
+          { "type": "object", "properties": { "mode": { "const": "login" }, "email": { "type": "string" }, "password": { "type": "string" } } },
+          { "type": "object", "properties": { "mode": { "const": "signup" }, "emailDomain": { "type": "string" } } }
+        ]
+      },
+      "RunOptions": {
+        "type": "object",
+        "properties": {
+          "voice": { "type": "string", "enum": ["male", "female", "neutral"], "default": "neutral" },
+          "zoom": { "type": "boolean", "default": true },
+          "length": { "type": "string", "enum": ["short", "medium", "long"], "default": "short" },
+          "captions": { "type": "boolean", "default": true },
+          "guidance": { "type": "string" },
+          "credentials": { "$ref": "#/components/schemas/Credentials" }
+        }
+      },
+      "Run": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "url": { "type": "string" },
+          "status": { "type": "string", "enum": ["created", "exploring", "planning", "recording", "uploading", "done", "failed"] },
+          "options": { "$ref": "#/components/schemas/RunOptions" },
+          "brief": { "type": "string" },
+          "guidance": { "type": "string" },
+          "credentialsUsed": { "type": "object", "properties": { "email": { "type": "string" }, "password": { "type": "string" } } },
+          "playbackUrl": { "type": "string", "description": "Direct mp4 URL, once the run is done." },
+          "captionsUrl": { "type": "string", "description": "VTT captions URL, once the run is done and captions were on." },
+          "durationSec": { "type": "number" },
+          "error": { "type": "string", "description": "Present when status is \"failed\"." }
+        }
+      },
+      "RunEvent": {
+        "type": "object",
+        "properties": {
+          "seq": { "type": "integer" },
+          "agent": { "type": "string", "enum": ["scout", "mapper", "director", "presenter"] },
+          "level": { "type": "string", "enum": ["info", "error"] },
+          "message": { "type": "string" },
+          "url": { "type": "string" },
+          "sceneId": { "type": "string" }
+        }
+      }
+    }
+  }
+}

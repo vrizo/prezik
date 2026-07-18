@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* Warm placeholder theme (see AGENTS.md / NOTES.md) until real design
+   arrives: cream background, orange accent, dark warm-gray text. */
+@theme {
+  --color-cream: #faf6ef;
+  --color-accent: #e8590c;
+  --color-ink: #362f2a;
+  --color-ink-soft: #6b6058;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}

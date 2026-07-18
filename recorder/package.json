@@ -1,0 +1,27 @@
+{
+  "name": "@prezik/recorder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "demo": "tsx src/cli.ts --storyboard fixtures/pain-tracker.json --out tmp/",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "@prezik/shared": "file:../shared",
+    "dotenv": "17.4.2",
+    "playwright": "1.61.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "tsx": "4.23.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.111.0"
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "targetUrl": "https://pain-tracker.app",
+  "productName": "Pain Tracker",
+  "tagline": "Track headaches. Spot patterns. Take control.",
+  "language": "en",
+  "intro": {
+    "narration": "Meet Pain Tracker, a free migraine diary that helps you understand your headaches and finally see the patterns behind them."
+  },
+  "scenes": [
+    {
+      "id": "hero",
+      "title": "Welcome",
+      "narration": "It starts right here on the homepage. Log headaches in seconds, spot what triggers them, and take back a little control over your day.",
+      "actions": [
+        { "type": "goto", "url": "https://pain-tracker.app" },
+        { "type": "wait", "ms": 900 },
+        { "type": "scrollTo", "selector": "#hero" },
+        { "type": "hover", "selector": "#hero h1" },
+        { "type": "highlight", "selector": "#hero h1" }
+      ]
+    },
+    {
+      "id": "features",
+      "title": "Features",
+      "narration": "Everything you need lives in one place: AI recognition, voice pain logs, a calendar with statistics, and clear reports you can share with your doctor.",
+      "actions": [
+        { "type": "scrollTo", "selector": "#features" },
+        { "type": "hover", "selector": "#features h2" },
+        { "type": "highlight", "selector": "#features h2" },
+        { "type": "zoom", "selector": "#features h2", "paddingPx": 80 },
+        { "type": "wait", "ms": 1400 },
+        { "type": "zoomOut" }
+      ]
+    },
+    {
+      "id": "pricing",
+      "title": "Pricing",
+      "narration": "And the best part? It is completely free, forever. No credit card, no catch. Just a simple tool to help you manage your pain.",
+      "actions": [
+        { "type": "scrollTo", "selector": "#pricing" },
+        { "type": "hover", "selector": "#pricing h2" },
+        { "type": "highlight", "selector": "#pricing h2" },
+        { "type": "wait", "ms": 800 }
+      ]
+    }
+  ],
+  "outro": {
+    "narration": "That is Pain Tracker. Start tracking today, and let your patterns tell the story. Feel better, one entry at a time."
+  }
+}

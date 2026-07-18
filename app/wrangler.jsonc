@@ -1,0 +1,40 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prezik-app",
+  "main": "worker.ts",
+  "compatibility_date": "2026-07-15",
+  "compatibility_flags": ["nodejs_compat"],
+  // Static SPA build (3 screens, client-side pathname routing — see
+  // src/App.tsx) served as assets. The Worker itself only runs for /mcp
+  // (see worker.ts); everything else falls straight through to the asset
+  // handler. Unmatched paths (e.g. /run/<id>) serve index.html so the SPA's
+  // own router can take over.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/mcp", "/mcp/*"]
+  },
+  "vars": {
+    // Same Convex deployment used for local dev right now (see
+    // app/README.md) — no separate staging/production Convex deployment
+    // has been provisioned yet.
+    "CONVEX_HTTP_ACTIONS_URL": "https://polished-chicken-876.eu-west-1.convex.site"
+  },
+  "env": {
+    "staging": {
+      "name": "prezik-app-staging",
+      "routes": [{ "pattern": "present-staging.vrizo.net", "custom_domain": true }],
+      "vars": {
+        "CONVEX_HTTP_ACTIONS_URL": "https://polished-chicken-876.eu-west-1.convex.site"
+      }
+    },
+    "production": {
+      "name": "prezik-app-production",
+      "routes": [{ "pattern": "app.present.vrizo.net", "custom_domain": true }],
+      "vars": {
+        "CONVEX_HTTP_ACTIONS_URL": "https://polished-chicken-876.eu-west-1.convex.site"
+      }
+    }
+  }
+}

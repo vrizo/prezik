@@ -1,0 +1,56 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "recorder",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-01",
+
+  // Inheritable: applies to every environment. The container class is a
+  // SQLite-backed Durable Object, so it must use new_sqlite_classes.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Recorder"] }],
+
+  // containers, durable_objects, r2_buckets and vars are NOT inheritable —
+  // repeat per env.
+  "env": {
+    "staging": {
+      "name": "recorder-staging",
+      "containers": [
+        {
+          "class_name": "Recorder",
+          "image": "./Dockerfile",
+          // Build context = repo root so the file:../shared dependency is present.
+          "image_build_context": "..",
+          "instance_type": "standard-2",
+          "max_instances": 3
+        }
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "RECORDER", "class_name": "Recorder" }]
+      },
+      "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "prezik-videos-staging" }],
+      "vars": {
+        "APP_ENV": "staging",
+        "WORKER_PUBLIC_URL": "https://recorder-staging.vitalii-rizo.workers.dev"
+      }
+    },
+    "production": {
+      "name": "recorder-production",
+      "containers": [
+        {
+          "class_name": "Recorder",
+          "image": "./Dockerfile",
+          "image_build_context": "..",
+          "instance_type": "standard-3",
+          "max_instances": 10
+        }
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "RECORDER", "class_name": "Recorder" }]
+      },
+      "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "prezik-videos-production" }],
+      "vars": {
+        "APP_ENV": "production",
+        "WORKER_PUBLIC_URL": "https://recorder-production.vitalii-rizo.workers.dev"
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@prezik/app",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:convex": "convex dev",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "seed": "convex run seed:run",
+    "deploy:staging": "wrangler deploy --env staging"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "4.0.14",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@prezik/shared": "file:../shared",
+    "ai": "7.0.28",
+    "convex": "1.42.2",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.2",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "tailwindcss": "4.3.2",
+    "typescript": "7.0.2",
+    "vite": "8.1.4",
+    "vitest": "4.1.10",
+    "wrangler": "4.110.0"
+  }
+}

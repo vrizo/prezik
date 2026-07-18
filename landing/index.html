@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prezik — Paste a link. A good dog does the rest.</title>
+    <meta
+      name="description"
+      content="Four AI agents explore your web app and film a narrated demo video. Cursor, highlights, zooms, voice."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Prezik — Paste a link. A good dog does the rest." />
+    <meta
+      property="og:description"
+      content="Four AI agents explore your web app and film a narrated demo video. Cursor, highlights, zooms, voice."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>%F0%9F%90%95</text></svg>"
+    />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="site-header">
+        <span class="logo">Prezik</span>
+      </header>
+
+      <main>
+        <section class="hero">
+          <div class="hero-copy">
+            <h1>Paste a link. A good dog does the rest.</h1>
+            <p class="subline">
+              Four AI agents explore your web app and film a narrated demo video.
+              Cursor, highlights, zooms, voice.
+            </p>
+
+            <form id="demo-form" class="url-form" novalidate>
+              <label class="sr-only" for="url-input">Your web app URL</label>
+              <input
+                id="url-input"
+                class="url-input"
+                name="url"
+                type="text"
+                inputmode="url"
+                autocomplete="url"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
+                placeholder="yourapp.com"
+              />
+              <button type="submit" class="submit-button">Fetch my demo</button>
+              <p id="url-error" class="form-error" role="alert" hidden></p>
+            </form>
+          </div>
+
+          <div class="hero-art" aria-hidden="true">
+            <svg viewBox="0 0 240 160" xmlns="http://www.w3.org/2000/svg">
+              <path
+                class="doodle"
+                d="M20,95 L18,78 Q24,60 30,52 L36,46 L44,20 L54,42 L64,48 Q88,38 135,35 Q165,37 178,44 L186,54 L184,88 L190,124 L177,121 L180,95 L158,89 L120,91 L98,86 L92,120 L79,117 L85,90 L68,87 L50,90 L20,95 M46,54 L46.4,54"
+              />
+              <path class="doodle dog-tail" d="M186,54 Q202,44 200,26 Q199,18 207,20" />
+            </svg>
+          </div>
+        </section>
+
+        <section class="steps">
+          <div class="step">
+            <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path class="doodle" d="M6,36 C10,20 18,14 24,24 C30,34 38,28 40,12" />
+            </svg>
+            <h2>Sniff</h2>
+            <p>Four agents sniff out what your app does, page by page.</p>
+          </div>
+
+          <div class="step">
+            <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path class="doodle" d="M6,40 L16,26 L22,40 L32,24 L38,40 L44,22" />
+            </svg>
+            <h2>Walk</h2>
+            <p>They walk the whole thing, mapping every page.</p>
+          </div>
+
+          <div class="step">
+            <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path
+                class="doodle"
+                d="M10,10 Q6,10 6,16 L6,24 Q6,30 12,30 L15,30 L13,38 L23,30 L36,30 Q42,30 42,24 L42,16 Q42,10 36,10 Z"
+              />
+            </svg>
+            <h2>Bark</h2>
+            <p>Then they bark: a narrated video with cursor, highlights, and zooms.</p>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>One-time packs. No subscriptions. Built for builders.</p>
+        <p class="fine-print">100 percent off with code tech-europe-hackathon</p>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
