@@ -2,7 +2,7 @@ MCP
 
 The product is drivable from a coding agent via MCP (streamable HTTP), so a builder can regenerate their demo right after a deploy.
 
-Endpoint: /mcp on the app host (present-staging.vrizo.net/mcp on staging, app.present.vrizo.net/mcp in production). Stateless; implemented in the app Worker with @modelcontextprotocol/sdk, proxying to the Convex HTTP API.
+Endpoint: /mcp on the app host (present-staging.vrizo.net/mcp on staging, prezik.vrizo.net/mcp in production). Stateless; implemented in the app Worker with @modelcontextprotocol/sdk, proxying to the Convex HTTP API.
 
 Tools:
 - create_run { url, options? } — start a video run. Returns runId and sessionId.

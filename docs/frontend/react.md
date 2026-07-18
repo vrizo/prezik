@@ -1,6 +1,6 @@
 # Frontend React guidelines
 
-Rules for the web app (frontend/web). The Next.js landing is not covered by this page.
+Rules for the web app (frontend/web).
 
 ## Stack
 

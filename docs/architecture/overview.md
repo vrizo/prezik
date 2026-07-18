@@ -1,6 +1,6 @@
 Architecture
 
-Flow: landing (present.vrizo.net) takes a URL and redirects to the app with it. The app creates an anonymous session (cookie) and a run. Four product agents work the run:
+Flow: the app (prezik.vrizo.net) takes a URL, creates an anonymous session (cookie) and a run. Four product agents work the run:
 
 1. Scout: Tavily search + reading the public site. Output: a short product brief.
 2. Mapper: asks the recorder service to crawl with a real browser (map mode, signs up or logs in if credentials are set). Output: sitemap pages + up to 20 uniqueness-verified element selectors per page + live screenshots. The Director may only use selectors verbatim from that data.
