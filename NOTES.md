@@ -26,18 +26,18 @@ If the agent stucks because it requires test credentials, but credentials are no
 ---
 save in local storage the selected options
 ---
-sebastian in front of me
+add human agent presenter
 ---
 
 Custom instructions:
+
+There are other agents working in parallel. Avoid conflicts.
 
 Be careful with reading log files, limit the length, otherwise it will consume the entire context immediately.
 
 Feel free to use sub agents to verify with clear context if needed.
 
 Do NOT add hidden fallbacks, tons of guards and mocks, silent recovery flows, and so on.
-
-A connection to the local database is also appreciated.
 
 Please save tokens and my money by orchestrating Opus 4.6/4.8 and Sonnet 5 models depending on the complexity. Do not use MAX.
 
