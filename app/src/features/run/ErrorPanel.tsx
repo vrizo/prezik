@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../convex/_generated/api";
-import { Pup } from "../../components/ui/Pup";
+import errorPup from "../../assets/prezik-error.png";
 import { latestEventUrl, pathOf, type Step } from "./runPhases";
 import type { RunDoc } from "./RunScreen";
 
@@ -41,7 +41,7 @@ export function ErrorPanel({ run, events, step, onRetry }: Props) {
 
   return (
     <div className="mt-[22px] flex items-start gap-4 rounded-[16px] border border-[#f3c9c1] bg-[#fdf1ef] p-5">
-      <Pup pose="error" className="h-16 w-16 flex-none text-[#c0392b]" />
+      <img src={errorPup} alt="" className="w-20 flex-none self-center" />
       <div className="flex-1">
         <h3 className="mb-1 text-[18px] font-bold text-[#a5301f]">
           {STEP_GERUND[step]} stopped on {path}
