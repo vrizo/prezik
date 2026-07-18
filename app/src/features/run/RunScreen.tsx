@@ -4,6 +4,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { newPath, runPath } from "../../lib/paths";
+import { NotFoundScreen } from "../../components/NotFoundScreen";
 import { GradientBackdrop } from "../../components/ui/GradientBackdrop";
 import { PhaseStepper } from "../../components/ui/PhaseStepper";
 import { SubStepper } from "./SubStepper";
@@ -55,20 +56,7 @@ export function RunScreen({ runId, navigate }: Props) {
     );
   }
   if (run === null) {
-    return (
-      <main className="grid place-items-center bg-page py-40 text-[15px] text-sub">
-        <div className="text-center">
-          <p>Run not found.</p>
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="mt-3 rounded-full bg-ink px-5 py-2 text-[14px] font-semibold text-white hover:bg-[#44403a]"
-          >
-            Back to start
-          </button>
-        </div>
-      </main>
-    );
+    return <NotFoundScreen navigate={navigate} />;
   }
   if (run.status === "done") {
     // Re-record returns to the landing with the URL pre-filled rather than

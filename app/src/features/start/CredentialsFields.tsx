@@ -39,10 +39,12 @@ type Props = {
   draft: CredentialsDraft;
   onChange: (draft: CredentialsDraft) => void;
   error: string | null;
+  store: boolean;
+  onStoreChange: (store: boolean) => void;
 };
 
 export const CredentialsFields = forwardRef<HTMLInputElement, Props>(function CredentialsFields(
-  { draft, onChange, error },
+  { draft, onChange, error, store, onStoreChange },
   emailRef,
 ) {
   return (
@@ -94,8 +96,18 @@ export const CredentialsFields = forwardRef<HTMLInputElement, Props>(function Cr
 
       {error && <p className="mt-2.5 text-xs font-medium text-[#b2551a]">{error}</p>}
 
+      <label className="mt-3 flex w-fit cursor-pointer items-center gap-2 text-xs text-sub">
+        <input
+          type="checkbox"
+          checked={store}
+          onChange={(e) => onStoreChange(e.target.checked)}
+          className="h-[15px] w-[15px] cursor-pointer accent-ink"
+        />
+        Remember in this browser for next time
+      </label>
+
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-xs text-faint">Used once for this run, then deleted</span>
+        <span className="text-xs text-faint">Used once for this run, then deleted from our servers</span>
         {draft.mode === "login" ? (
           <button
             type="button"

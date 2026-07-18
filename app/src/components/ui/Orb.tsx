@@ -2,7 +2,7 @@
 // Gradient stacks copied verbatim from design-orb.html. Size/shape is
 // controlled by the parent via `className` (square, any border-radius the
 // parent sets is overridden by the orb's own full rounding).
-export type OrbTheme = "orange" | "purple" | "blue" | "mono";
+export type OrbTheme = "orange" | "purple" | "blue" | "green" | "mono";
 
 const ORB_GRADIENTS: Record<OrbTheme, string> = {
   orange:
@@ -10,6 +10,8 @@ const ORB_GRADIENTS: Record<OrbTheme, string> = {
   purple:
     "radial-gradient(54% 54% at 34% 30%,#f2b3ff 0,transparent 55%),radial-gradient(60% 60% at 66% 42%,#8a7bff 0,transparent 55%),radial-gradient(60% 60% at 52% 80%,#4f6bff 0,transparent 60%),radial-gradient(50% 50% at 24% 70%,#d05cff 0,transparent 55%),linear-gradient(135deg,#c39bff,#5b6bff)",
   blue: "radial-gradient(54% 54% at 30% 30%,#a6d4ff 0,transparent 55%),radial-gradient(60% 60% at 70% 45%,#4a7bff 0,transparent 55%),radial-gradient(62% 60% at 56% 82%,#ff6a3d 0,transparent 60%),radial-gradient(50% 50% at 22% 80%,#242a63 0,transparent 60%),linear-gradient(135deg,#7fb0ff,#2a3aa0)",
+  green:
+    "radial-gradient(54% 54% at 30% 30%,#c9f0b1 0,transparent 55%),radial-gradient(60% 60% at 70% 45%,#4cae4f 0,transparent 55%),radial-gradient(62% 60% at 56% 82%,#1c7c3a 0,transparent 60%),radial-gradient(50% 50% at 22% 80%,#12401f 0,transparent 60%),linear-gradient(135deg,#8fd07a,#2e7d32)",
   mono: "radial-gradient(54% 54% at 35% 30%,#eef1ec 0,transparent 55%),radial-gradient(60% 60% at 66% 46%,#cfd6cb 0,transparent 55%),radial-gradient(60% 60% at 55% 82%,#9aa79a 0,transparent 60%),linear-gradient(135deg,#e9ede7,#a9b2a5)",
 };
 
@@ -17,6 +19,7 @@ const ORB_SATURATE: Record<OrbTheme, number> = {
   orange: 1.08,
   purple: 1.08,
   blue: 1.08,
+  green: 1.08,
   mono: 1.02,
 };
 
@@ -49,8 +52,10 @@ export function Orb({ theme, play = false, className = "" }: Props) {
         />
         <div className="bg-grain pointer-events-none absolute inset-0 opacity-50 mix-blend-overlay" />
         {play && (
+          // `hidden` for now — nothing to play yet; re-enable once there's a
+          // demo video behind it.
           <div
-            className="absolute left-1/2 top-1/2 grid aspect-square w-[26%] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white"
+            className="absolute left-1/2 top-1/2 hidden aspect-square w-[26%] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white"
             style={{ boxShadow: "0 4px 16px rgba(0,0,0,.2)" }}
           >
             <svg viewBox="0 0 24 24" fill="#111" style={{ width: "38%" }} aria-hidden="true">

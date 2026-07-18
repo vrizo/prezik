@@ -13,22 +13,40 @@ import { canStartRun } from "./entitlement";
 import { CredentialsFields, EMPTY_LOGIN_DRAFT, deriveCredentials, type CredentialsDraft } from "./CredentialsFields";
 import { ConfirmNoCredsModal } from "./ConfirmNoCredsModal";
 import { OptionsFields, type PersonalisationOptions } from "./OptionsFields";
+import { InstructionsField } from "./InstructionsField";
 
 const DEFAULT_PERSONALISATION: PersonalisationOptions = {
   voice: "neutral",
   zoom: true,
   length: "short",
-  captions: false, // coming soon — can't be enabled
+  captions: true,
+  format: "horizontal",
 };
 
 const OPTIONS_STORAGE_KEY = "prezik.options";
+const CREDS_STORAGE_KEY = "prezik.credentials";
+const INSTRUCTIONS_STORAGE_KEY = "prezik.instructions";
 
-// Last-used personalisation, restored across visits. Captions is forced off
-// (coming soon) even if an older stored value had it on.
+type StoredCreds = { store: boolean; draft?: CredentialsDraft };
+
+function loadStoredCreds(): StoredCreds {
+  try {
+    const raw = localStorage.getItem(CREDS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as StoredCreds;
+      return { store: parsed.store !== false, draft: parsed.draft };
+    }
+  } catch {
+    // corrupted storage — fall back to defaults
+  }
+  return { store: true };
+}
+
+// Last-used personalisation, restored across visits.
 function loadStoredOptions(): PersonalisationOptions {
   try {
     const raw = localStorage.getItem(OPTIONS_STORAGE_KEY);
-    if (raw) return { ...DEFAULT_PERSONALISATION, ...JSON.parse(raw), captions: false };
+    if (raw) return { ...DEFAULT_PERSONALISATION, ...JSON.parse(raw) };
   } catch {
     // corrupted storage — fall back to defaults
   }
@@ -73,7 +91,34 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
     setPersonalisation(next);
     localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(next));
   }
-  const [credDraft, setCredDraft] = useState<CredentialsDraft>(EMPTY_LOGIN_DRAFT);
+  const [storedCreds] = useState(loadStoredCreds);
+  const [credDraft, setCredDraft] = useState<CredentialsDraft>(storedCreds.draft ?? EMPTY_LOGIN_DRAFT);
+  const [storeCreds, setStoreCreds] = useState(storedCreds.store);
+
+  function persistCreds(store: boolean, draft: CredentialsDraft) {
+    localStorage.setItem(
+      CREDS_STORAGE_KEY,
+      JSON.stringify(store ? { store, draft } : { store }),
+    );
+  }
+
+  function updateCredDraft(draft: CredentialsDraft) {
+    setCredDraft(draft);
+    persistCreds(storeCreds, draft);
+  }
+
+  function updateStoreCreds(store: boolean) {
+    setStoreCreds(store);
+    persistCreds(store, credDraft);
+  }
+  const [instructions, setInstructions] = useState(
+    () => localStorage.getItem(INSTRUCTIONS_STORAGE_KEY) ?? "",
+  );
+
+  function updateInstructions(next: string) {
+    setInstructions(next);
+    localStorage.setItem(INSTRUCTIONS_STORAGE_KEY, next);
+  }
   const [couponInput, setCouponInput] = useState("");
   const [couponMessage, setCouponMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -127,9 +172,14 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
     setSubmitError(null);
     setSubmitting(true);
     try {
+      const guidance = instructions.trim();
       const { runId } = await createRun({
         url,
-        options: { ...personalisation, credentials: finalCredentials },
+        options: {
+          ...personalisation,
+          credentials: finalCredentials,
+          ...(guidance ? { guidance } : {}),
+        },
         sessionId: session.sessionId,
       });
       navigate(runPath(runId), { freshRun: true });
@@ -195,7 +245,15 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
 
           <div className="mx-auto flex max-w-[620px] flex-col gap-5">
             <OptionsFields options={personalisation} onChange={updatePersonalisation} />
-            <CredentialsFields ref={emailRef} draft={credDraft} onChange={setCredDraft} error={credError} />
+            <CredentialsFields
+              ref={emailRef}
+              draft={credDraft}
+              onChange={updateCredDraft}
+              error={credError}
+              store={storeCreds}
+              onStoreChange={updateStoreCreds}
+            />
+            <InstructionsField value={instructions} onChange={updateInstructions} />
 
             {submitError && <p className="text-center text-sm text-red-600">{submitError}</p>}
 
