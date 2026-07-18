@@ -39,9 +39,9 @@ export function PlanView({ storyboard, live, stepper }: Props) {
             <h2 className="whitespace-nowrap text-[26px] font-bold tracking-[-0.025em]">
               Planning the demo
             </h2>
-            {live && <SpinnerArc size={20} strokeColor="#605c55" />}
+            {live && <SpinnerArc size={20} strokeColor="#605c55" className="relative top-[1px]" />}
           </div>
-          <p className="mt-1 text-[15px] text-sub">
+          <p className="text-[15px] text-sub">
             Deciding <b className="text-ink">what to record</b> and <b className="text-ink">what to say</b>,
             scene by scene
           </p>

@@ -2,6 +2,22 @@ import { useState } from "react";
 import { Orb } from "../../components/ui/Orb";
 import { Logo } from "../../components/Logo";
 import { newPath } from "../../lib/paths";
+import techEuropeLogo from "../../assets/tech-europe-logo.svg";
+
+const FEATURES = [
+  {
+    title: "Autonomous exploration",
+    body: "Agents crawl your app, sign in, and map every page.",
+  },
+  {
+    title: "Story & narration",
+    body: "AI writes the storyboard and speaks a natural voiceover.",
+  },
+  {
+    title: "Cinematic capture",
+    body: "Visible cursor, highlights, and smooth zooms — recorded in 60–90s.",
+  },
+];
 
 type Props = { navigate: (path: string, opts?: { freshRun?: boolean }) => void };
 
@@ -70,7 +86,7 @@ export function LandingScreen({ navigate }: Props) {
             </form>
             {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
             <div className="mt-[18px] text-[13px] text-faint">
-              Pay per run, no subscription, built for builders
+              Pay per run, no subscription
             </div>
           </div>
 
@@ -96,6 +112,63 @@ export function LandingScreen({ navigate }: Props) {
         </div>
       </div>
 
+      <div>
+        <div className="text-[13px] font-semibold uppercase tracking-wide text-faint">How it works</div>
+        <h2 className="mt-1.5 text-[28px] font-bold tracking-[-0.03em] sm:text-[34px]">
+          From link to video, hands-off
+        </h2>
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {FEATURES.map((feature) => (
+            <div key={feature.title} className="rounded-[20px] border border-line bg-bg p-6">
+              <div
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ background: "linear-gradient(135deg,#ff9c52,#c62a06)" }}
+              />
+              <div className="mt-3 font-semibold text-ink">{feature.title}</div>
+              <p className="mt-1.5 text-[15px] leading-[1.5] text-sub">{feature.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-[30px] bg-ink p-8 text-white sm:p-10">
+        <div className="text-[13px] font-semibold uppercase tracking-wide text-white/60">For builders</div>
+        <h2 className="mt-1.5 text-[28px] font-bold tracking-[-0.03em] sm:text-[34px]">Full API & MCP access</h2>
+        <p className="mt-3 max-w-[520px] text-[15px] leading-[1.5] text-white/70">
+          Drive Prezik from your coding agent over MCP or plain HTTP. Regenerate your demo automatically after every
+          deploy.
+        </p>
+        <a
+          href="https://github.com/vrizo/prezik/tree/main/docs/api"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-[15px] font-semibold text-ink hover:bg-white/90"
+        >
+          Read the docs
+          <span aria-hidden>→</span>
+        </a>
+      </div>
+
+      <div className="relative overflow-hidden rounded-[30px] text-white" style={{ background: "linear-gradient(135deg,#ff9c52,#c62a06)" }}>
+        <div aria-hidden className="bg-grain pointer-events-none absolute inset-0 opacity-[.18] mix-blend-overlay" />
+        <div className="relative flex flex-col items-start gap-4 p-8 sm:flex-row sm:items-center sm:justify-between sm:p-10">
+          <div className="flex items-center gap-4">
+            <img src={techEuropeLogo} alt="" className="h-8 w-8 rounded-[6px]" />
+            <div>
+              <div className="text-[13px] font-semibold uppercase tracking-wide text-white/80">
+                Sponsored by {"{Tech: Europe}"}
+              </div>
+              <p className="mt-1 text-[17px] font-semibold leading-[1.4] sm:text-lg">
+                Use code{" "}
+                <code className="rounded-full bg-white/20 px-3 py-1 font-mono font-semibold tracking-wide">
+                  TECH-EUROPE-HACKATHON
+                </code>{" "}
+                for one free generation.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
