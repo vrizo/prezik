@@ -20,6 +20,7 @@ const STAGE_ORDER: RunStatus[] = [
   "created",
   "exploring",
   "planning",
+  "needs_credentials",
   "recording",
   "uploading",
   "done",

@@ -37,6 +37,19 @@ describe("deriveAgentStates", () => {
     expect(byAgent.director.state).toBe("working");
   });
 
+  it("does not mark presenter done when the run stops at needs_credentials", () => {
+    const states = deriveAgentStates(
+      [
+        { agent: "scout", level: "info", message: "brief ready: ..." },
+        { agent: "mapper", level: "info", message: "mapping done: 2 pages found" },
+        { agent: "director", level: "info", message: "this product requires sign-in" },
+      ],
+      "needs_credentials",
+    );
+    const byAgent = Object.fromEntries(states.map((s) => [s.agent, s]));
+    expect(byAgent.presenter.state).not.toBe("done");
+  });
+
   it("a later agent's success does not erase an earlier agent's error", () => {
     const states = deriveAgentStates(
       [
