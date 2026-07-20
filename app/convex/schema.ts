@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import {
   agentNameValidator,
   pageElementValidator,
+  planProgressSceneValidator,
   runEventLevelValidator,
   runOptionsValidator,
   runStatusValidator,
@@ -56,6 +57,17 @@ export default defineSchema({
   storyboards: defineTable({
     runId: v.id("runs"),
     data: storyboardValidator,
+  }).index("by_run", ["runId"]),
+
+  // Live scratch row the Director writes while it streams the plan: the model's
+  // running reasoning summary, the scenes drafted so far, and whether reasoning
+  // has finished (the model has started emitting the storyboard JSON). Deleted
+  // once the real storyboard is saved.
+  plan_progress: defineTable({
+    runId: v.id("runs"),
+    thinking: v.string(),
+    thinkingDone: v.boolean(),
+    scenes: v.array(planProgressSceneValidator),
   }).index("by_run", ["runId"]),
 
   coupons: defineTable({

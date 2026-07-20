@@ -6,7 +6,8 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { newPath, runPath } from "../../lib/paths";
 import { NotFoundScreen } from "../../components/NotFoundScreen";
 import { GradientBackdrop } from "../../components/ui/GradientBackdrop";
-import { PhaseStepper } from "../../components/ui/PhaseStepper";
+import { PhaseStepper, type Phase } from "../../components/ui/PhaseStepper";
+import { LinkStepForm } from "../start/LinkStepScreen";
 import { SubStepper } from "./SubStepper";
 import { ExploreView } from "./ExploreView";
 import { PlanView } from "./PlanView";
@@ -14,7 +15,14 @@ import { RecordView } from "./RecordView";
 import { ErrorPanel } from "./ErrorPanel";
 import { NeedsCredentials } from "./NeedsCredentials";
 import { ReadyView } from "./ReadyView";
-import { currentSceneIndex, failedStep, stepOf, stepStates, type Step } from "./runPhases";
+import {
+  currentSceneIndex,
+  failedStep,
+  stepOf,
+  stepStates,
+  type Step,
+  type StepState,
+} from "./runPhases";
 
 // The exact shape api.runs.get returns (run doc minus runTokenHash),
 // derived from the query itself so it can never drift from reality.
@@ -26,6 +34,9 @@ export function RunScreen({ runId, navigate }: Props) {
   const id = runId as Id<"runs">;
 
   const [viewedStep, setViewedStep] = useState<Step>("explore");
+  // Which top-level phase a finished run is reviewing. Only meaningful once the
+  // run is done; the stepper writes it, and the run lands on "ready".
+  const [viewedPhase, setViewedPhase] = useState<Phase>("ready");
   const [revealed] = useState(() => window.history.state?.freshRun === true);
   const prevLiveRef = useRef<Step | null>(null);
 
@@ -42,6 +53,12 @@ export function RunScreen({ runId, navigate }: Props) {
       : "skip",
   );
   const frames = useQuery(api.frames.list, viewedStep === "record" ? { runId: id } : "skip");
+  // The Director's live scratch row: streaming thinking + drafted scenes,
+  // only while the plan is actually being written.
+  const planProgress = useQuery(
+    api.planProgress.get,
+    viewedStep === "plan" && run?.status === "planning" ? { runId: id } : "skip",
+  );
 
   const rerecord = useMutation(api.runs.rerecord);
 
@@ -59,11 +76,32 @@ export function RunScreen({ runId, navigate }: Props) {
     return <NotFoundScreen navigate={navigate} />;
   }
   if (run.status === "done") {
-    // Re-record returns to the landing with the URL pre-filled rather than
-    // silently starting a new charged run.
-    return (
-      <ReadyView run={run} onRerecord={() => navigate(`/?url=${encodeURIComponent(run.url)}`)} />
-    );
+    // A finished run is reviewable across all three phases; the stepper drives
+    // which one shows. "Creating" falls through to the sub-step body below.
+    const { credentials, ...personalisation } = run.options;
+    if (viewedPhase === "link") {
+      return (
+        <LinkStepForm
+          url={run.url}
+          navigate={navigate}
+          readOnly={{
+            options: personalisation,
+            credentials,
+            guidance: run.options.guidance ?? run.guidance ?? "",
+            onSelectPhase: setViewedPhase,
+          }}
+        />
+      );
+    }
+    if (viewedPhase === "ready") {
+      return (
+        <ReadyView
+          run={run}
+          onRerecord={() => navigate(`/?url=${encodeURIComponent(run.url)}`)}
+          onSelectPhase={setViewedPhase}
+        />
+      );
+    }
   }
 
   // The director determines needs_credentials while planning; failures map to
@@ -79,7 +117,12 @@ export function RunScreen({ runId, navigate }: Props) {
     if (viewedStep !== liveStep) setViewedStep(liveStep);
   }
 
-  const states = stepStates(liveStep);
+  // A done run reviewing "Creating": every sub-step is finished, so show all
+  // three as done (and clickable) rather than the live step as active.
+  const states: Record<Step, StepState> =
+    run.status === "done"
+      ? { explore: "done", plan: "done", record: "done" }
+      : stepStates(liveStep);
   const failedChip = run.status === "failed" ? failedStepValue : null;
   const stepper = <SubStepper states={states} failed={failedChip} onSelect={setViewedStep} />;
 
@@ -95,7 +138,11 @@ export function RunScreen({ runId, navigate }: Props) {
       />
 
       <div className="relative mx-auto my-8 max-w-[1050px] rounded-[22px] bg-white px-10 py-8 shadow-[0_30px_70px_rgba(0,0,0,.22)]">
-        <PhaseStepper phase="creating" className="mb-[26px]" />
+        <PhaseStepper
+          phase="creating"
+          className="mb-[26px]"
+          onSelect={run.status === "done" ? setViewedPhase : undefined}
+        />
 
         {/* The step view always renders — a failure adds the error box below
             it instead of hiding the run's progress. */}
@@ -109,7 +156,12 @@ export function RunScreen({ runId, navigate }: Props) {
               stepper={stepper}
             />
           ) : viewedStep === "plan" ? (
-            <PlanView storyboard={storyboard} live={run.status === "planning"} stepper={stepper} />
+            <PlanView
+              storyboard={storyboard}
+              progress={planProgress}
+              live={run.status === "planning"}
+              stepper={stepper}
+            />
           ) : (
             <RecordView
               events={events}

@@ -9,7 +9,7 @@ const execFileP = promisify(execFile);
 // dev machine (ffmpeg-full first — the plain formula lacks libass, which the
 // caption burn-in needs), then the bare name on PATH (how it resolves inside
 // the container, where the Debian build includes libass).
-function resolveBin(name: "ffmpeg" | "ffprobe"): string {
+export function resolveBin(name: "ffmpeg" | "ffprobe"): string {
   const override = process.env[`${name.toUpperCase()}_PATH`];
   if (override) return override;
   const brewFull = `/opt/homebrew/opt/ffmpeg-full/bin/${name}`;

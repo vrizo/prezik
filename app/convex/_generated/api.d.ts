@@ -19,6 +19,7 @@ import type * as lib_crypto from "../lib/crypto.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_events from "../lib/events.js";
 import type * as lib_validators from "../lib/validators.js";
+import type * as planProgress from "../planProgress.js";
 import type * as prompts_director from "../prompts/director.js";
 import type * as prompts_scout from "../prompts/scout.js";
 import type * as runs from "../runs.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   "lib/errors": typeof lib_errors;
   "lib/events": typeof lib_events;
   "lib/validators": typeof lib_validators;
+  planProgress: typeof planProgress;
   "prompts/director": typeof prompts_director;
   "prompts/scout": typeof prompts_scout;
   runs: typeof runs;

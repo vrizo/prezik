@@ -1,14 +1,24 @@
 #!/usr/bin/env -S npx tsx
-// Prompt-training-loop runner. See docs/training/loop.md.
+// Training-loop runner. See docs/training/loop.md.
 //
-// Drives one (or --runs N sequential) full Prezik pipeline run(s) against a
-// target site over the public HTTP API, waits for the video, and has an LLM
-// judge score the result against the product prompts. Writes
-// logs/current/training-report.md with scores and concrete prompt-change
-// proposals for a coding agent to act on.
+// Two modes:
+// - --local (the training default): runs the ACTUAL pipeline code from this
+//   working tree in-process (scripts/local.ts) — no UI, no Convex deployment,
+//   same OpenAI requests and models as production. Artifacts (storyboard,
+//   events, map screenshots, video, captions, beat-anchored frames, cost)
+//   land in logs/current/training/<runId>/ for Claude to judge.
+// - remote (no flag): drives a deployed Convex backend over the public HTTP
+//   API (docs/api/http.md) — the smoke test for what is actually deployed.
+//
+// The gpt judge is DISABLED by default (Claude is the judge —
+// docs/training/loop.md); pass --judge in remote mode to run the legacy
+// gpt-5.6-sol judge.
 //
 // Usage:
-//   npx tsx scripts/train.ts --site <url> [--base <url>] [--runs N] [--signup <emailDomain> | --email <e> --password <p>]
+//   npx tsx scripts/train.ts --site <url> [--local] [--base <url>] [--runs N]
+//     [--signup <emailDomain> | --email <e> --password <p>]
+//     [--format horizontal|vertical] [--length short|medium|long]
+//     [--guidance <text>] [--label <name>] [--judge]
 //
 // No hidden fallbacks: every failure (run failed, timed out, malformed judge
 // output) is written to the report and the process exits non-zero.
@@ -23,6 +33,7 @@ import { z } from "zod";
 import { createLogger, initRunDir } from "@prezik/shared/logger";
 import { LENGTH_TO_SCENES } from "@prezik/shared";
 import type { RunEvent, RunOptions, RunStatus } from "@prezik/shared";
+import { runLocalPipeline, type CostReport, type PhaseTimings } from "./local";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -36,18 +47,27 @@ const POLL_INTERVAL_MS = 15_000;
 const POLL_TIMEOUT_MS = 15 * 60_000;
 const FFMPEG = "/opt/homebrew/bin/ffmpeg";
 const FFPROBE = "/opt/homebrew/bin/ffprobe";
-const FRAME_COUNT = 6;
-const JUDGE_MODEL = "gpt-5.6-sol"; // docs/agents/models.md — training-loop judge
+const FRAME_COUNT = 6; // remote mode only; local mode samples near scene beats
+const JUDGE_MODEL = "gpt-5.6-sol"; // legacy --judge only; Claude judges by default
 
-const USAGE = `Usage: npx tsx scripts/train.ts --site <url> [--base <url>] [--runs N] [--signup <emailDomain> | --email <e> --password <p>]
+const USAGE = `Usage: npx tsx scripts/train.ts --site <url> [--local] [--base <url>] [--runs N] [--signup <emailDomain> | --email <e> --password <p>]
 
   --site      required. Target web app to run the Prezik pipeline against.
-  --base      Convex HTTP actions URL. Default: ${DEFAULT_BASE}
+  --local     run the pipeline in-process from this working tree (no Convex
+              deployment; same models/OpenAI calls as production). Needs
+              OPENAI_API_KEY and TAVILY_API_KEY in the root .env.
+  --base      remote mode only: Convex HTTP actions URL. Default: ${DEFAULT_BASE}
   --runs      how many times to repeat, sequentially, each with a fresh session. Default: 1
   --signup    if set, requests credentials.mode "signup" with this email domain (default: mode "none")
   --email     with --password, requests credentials.mode "login" using these test credentials
   --password  with --email, the password for the test login (both are required together)
   --format    "horizontal" (default) or "vertical" — video orientation
+  --length    "short" (default), "medium", or "long" — video length
+  --guidance  free-form user guidance passed to the Director (as in the UI field)
+  --label     short name for this iteration, recorded in run-meta and the report
+              (use for A/B runs, e.g. "director-v8-baseline" vs "director-v9")
+  --judge     remote mode only: run the legacy ${JUDGE_MODEL} judge. Off by default —
+              Claude judges from the artifacts (docs/training/loop.md).
 
   --signup and --email/--password are mutually exclusive.`;
 
@@ -100,22 +120,35 @@ interface RunEventDoc extends RunEvent {
   seq: number;
 }
 
+// Extra facts a local (in-process) run knows about itself that a remote run
+// cannot see: exact cost, phase timings, prompt versions, storyboard on disk.
+interface LocalExtras {
+  cost: CostReport;
+  phases: PhaseTimings;
+  promptVersions: { scout: number; director: number };
+  storyboardPath?: string;
+  metaPath: string;
+  mapShotsDir: string;
+}
+
 type IterationResult =
   | {
       kind: "done";
       runId: string;
-      run: RunDoc;
-      judge: JudgeResult;
+      judge?: JudgeResult; // present only when the legacy --judge ran
       mp4Path: string;
       framePaths: string[];
       vttPath?: string;
+      local?: LocalExtras;
     }
-  | { kind: "failed"; runId?: string; reason: string; run?: RunDoc }
-  | { kind: "needs_credentials"; runId: string; run: RunDoc; reason: string };
+  | { kind: "failed"; runId?: string; reason: string }
+  | { kind: "needs_credentials"; runId: string; reason: string };
 
 // ---------------------------------------------------------------------------
 // CLI + env
 // ---------------------------------------------------------------------------
+
+const BOOLEAN_FLAGS = new Set(["local", "judge"]);
 
 function parseArgs(argv: string[]): {
   site: string;
@@ -124,12 +157,22 @@ function parseArgs(argv: string[]): {
   signupDomain?: string;
   login?: { email: string; password: string };
   format: "horizontal" | "vertical";
+  length: "short" | "medium" | "long";
+  guidance?: string;
+  label?: string;
+  local: boolean;
+  judge: boolean;
 } {
   const flags: Record<string, string> = {};
+  const bools = new Set<string>();
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (!arg.startsWith("--")) throw new Error(`unexpected argument "${arg}"\n\n${USAGE}`);
     const key = arg.slice(2);
+    if (BOOLEAN_FLAGS.has(key)) {
+      bools.add(key);
+      continue;
+    }
     const value = argv[i + 1];
     if (value === undefined || value.startsWith("--")) throw new Error(`flag --${key} needs a value\n\n${USAGE}`);
     flags[key] = value;
@@ -154,6 +197,16 @@ function parseArgs(argv: string[]): {
   if (format !== "horizontal" && format !== "vertical") {
     throw new Error(`--format must be "horizontal" or "vertical", got "${flags.format}"\n\n${USAGE}`);
   }
+  const length = flags.length ?? "short";
+  if (length !== "short" && length !== "medium" && length !== "long") {
+    throw new Error(`--length must be "short", "medium" or "long", got "${flags.length}"\n\n${USAGE}`);
+  }
+
+  const local = bools.has("local");
+  const judge = bools.has("judge");
+  if (local && judge) {
+    throw new Error(`--judge is remote-mode only; in --local mode Claude judges from the artifacts\n\n${USAGE}`);
+  }
 
   return {
     site: flags.site,
@@ -162,6 +215,11 @@ function parseArgs(argv: string[]): {
     signupDomain: flags.signup,
     login,
     format,
+    length,
+    guidance: flags.guidance,
+    label: flags.label,
+    local,
+    judge,
   };
 }
 
@@ -244,10 +302,13 @@ function runTool(cmd: string, args: string[]): string {
 // Step 1: start a run, redeeming the hackathon coupon on a no-credits error
 // ---------------------------------------------------------------------------
 
+// Defaults match what the UI sends (app/src/features/start/LinkStepScreen.tsx).
 function buildRunOptions(
   signupDomain: string | undefined,
   login: { email: string; password: string } | undefined,
   format: "horizontal" | "vertical",
+  length: "short" | "medium" | "long",
+  guidance: string | undefined,
 ): RunOptions {
   const credentials: RunOptions["credentials"] = login
     ? { mode: "login", email: login.email, password: login.password }
@@ -257,9 +318,10 @@ function buildRunOptions(
   return {
     voice: "neutral",
     zoom: true,
-    length: "short",
+    length,
     captions: true,
     format,
+    ...(guidance ? { guidance } : {}),
     credentials,
   };
 }
@@ -487,7 +549,14 @@ async function judgeRun(promptText: string, frames: Buffer[], log: DualLogger, t
 // One full pipeline run (steps 1-5)
 // ---------------------------------------------------------------------------
 
-async function judgeDoneRun(run: RunDoc, events: RunEventDoc[], log: DualLogger, tag: string, iterDir: string) {
+async function judgeDoneRun(
+  run: RunDoc,
+  events: RunEventDoc[],
+  log: DualLogger,
+  tag: string,
+  iterDir: string,
+  judgeEnabled: boolean,
+) {
   if (!run.playbackUrl) throw new Error(`run ${run._id} is "done" but has no playbackUrl`);
 
   const mp4Path = join(iterDir, "video.mp4");
@@ -508,6 +577,11 @@ async function judgeDoneRun(run: RunDoc, events: RunEventDoc[], log: DualLogger,
     writeFileSync(vttPath, vttText);
   } else {
     log.error(withTag(tag, "run has no captionsUrl despite captions being requested; judging without narration text"));
+  }
+
+  if (!judgeEnabled) {
+    log.info(withTag(tag, "gpt judge disabled (default) — artifacts saved for the Claude judge"));
+    return { judge: undefined, mp4Path, framePaths, vttPath };
   }
 
   const promptText = buildJudgeText({
@@ -534,8 +608,9 @@ async function trainOnce(params: {
   tag: string;
   runDir: string;
   log: DualLogger;
+  judgeEnabled: boolean;
 }): Promise<IterationResult> {
-  const { base, site, options, tag, runDir, log } = params;
+  const { base, site, options, tag, runDir, log, judgeEnabled } = params;
   let runId: string | undefined;
   try {
     const started = await startRun(base, site, options, log, tag);
@@ -544,13 +619,12 @@ async function trainOnce(params: {
     const { run, events } = await pollRun(base, started.runId, log, tag);
 
     if (run.status === "failed") {
-      return { kind: "failed", runId: run._id, run, reason: run.error ?? 'run status is "failed" but no error message was recorded' };
+      return { kind: "failed", runId: run._id, reason: run.error ?? 'run status is "failed" but no error message was recorded' };
     }
     if (run.status === "needs_credentials") {
       return {
         kind: "needs_credentials",
         runId: run._id,
-        run,
         reason: run.needsCredentialsReason ?? "the site requires sign-in and no credentials were provided",
       };
     }
@@ -559,14 +633,59 @@ async function trainOnce(params: {
       throw new Error(`unexpected terminal run status "${run.status}"`);
     }
 
-    log.info(withTag(tag, "run done: downloading video and judging"));
+    log.info(withTag(tag, "run done: downloading video and collecting artifacts"));
     const iterDir = join(runDir, "training", run._id);
     mkdirSync(iterDir, { recursive: true });
-    const judged = await judgeDoneRun(run, events, log, tag, iterDir);
-    return { kind: "done", runId: run._id, run, ...judged };
+    const judged = await judgeDoneRun(run, events, log, tag, iterDir, judgeEnabled);
+    return { kind: "done", runId: run._id, ...judged };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     return { kind: "failed", runId, reason };
+  }
+}
+
+// One --local iteration: the whole pipeline in-process (scripts/local.ts).
+async function localOnce(params: {
+  site: string;
+  options: RunOptions;
+  label?: string;
+  tag: string;
+  runDir: string;
+  log: DualLogger;
+}): Promise<IterationResult> {
+  const { site, options, label, tag, runDir, log } = params;
+  try {
+    const result = await runLocalPipeline({
+      site,
+      options,
+      label,
+      runDir,
+      log: {
+        info: (msg) => log.info(withTag(tag, msg)),
+        error: (msg) => log.error(withTag(tag, msg)),
+      },
+    });
+    if (result.kind === "needs_credentials") {
+      return { kind: "needs_credentials", runId: result.runId, reason: result.reason };
+    }
+    if (!result.artifacts.mp4Path) throw new Error(`local run ${result.runId} is "done" but produced no mp4`);
+    return {
+      kind: "done",
+      runId: result.runId,
+      mp4Path: result.artifacts.mp4Path,
+      framePaths: result.artifacts.framePaths,
+      vttPath: result.artifacts.vttPath,
+      local: {
+        cost: result.cost,
+        phases: result.phases,
+        promptVersions: result.promptVersions,
+        storyboardPath: result.artifacts.storyboardPath,
+        metaPath: result.artifacts.metaPath,
+        mapShotsDir: result.artifacts.mapShotsDir,
+      },
+    };
+  } catch (err) {
+    return { kind: "failed", reason: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -579,7 +698,7 @@ function renderScoreLine(label: string, dim: ScoreDim): string {
 }
 
 function writeReport(
-  meta: { site: string; base: string; runsRequested: number },
+  meta: { site: string; mode: "local" | "remote"; base: string; runsRequested: number; label?: string },
   results: IterationResult[],
   runDir: string,
   logsRoot: string,
@@ -588,7 +707,8 @@ function writeReport(
   lines.push("# Prezik training report");
   lines.push("");
   lines.push(`Site: ${meta.site}`);
-  lines.push(`API base: ${meta.base}`);
+  lines.push(`Mode: ${meta.mode}${meta.mode === "remote" ? ` (API base: ${meta.base})` : " (in-process, this working tree)"}`);
+  if (meta.label) lines.push(`Label: ${meta.label}`);
   lines.push(`Runs completed: ${results.length}/${meta.runsRequested}`);
   lines.push(`Generated: ${new Date().toISOString()}`);
   lines.push("");
@@ -618,30 +738,58 @@ function writeReport(
 
     lines.push("Result: done");
     lines.push("");
-    lines.push("### Scores (1-5)");
-    lines.push("");
-    lines.push(renderScoreLine("Coverage of real features", r.judge.coverageOfRealFeatures));
-    lines.push(renderScoreLine("Narration accuracy", r.judge.narrationAccuracy));
-    lines.push(renderScoreLine("Action quality", r.judge.actionQuality));
-    lines.push(renderScoreLine("Pacing", r.judge.pacing));
-    lines.push(renderScoreLine("Visual polish", r.judge.visualPolish));
-    lines.push("");
-    lines.push("### Prompt-change proposals");
-    lines.push("");
-    if (r.judge.proposals.length === 0) {
-      lines.push("(none — judge found nothing to change)");
+    if (r.judge) {
+      lines.push("### Scores (1-5)");
+      lines.push("");
+      lines.push(renderScoreLine("Coverage of real features", r.judge.coverageOfRealFeatures));
+      lines.push(renderScoreLine("Narration accuracy", r.judge.narrationAccuracy));
+      lines.push(renderScoreLine("Action quality", r.judge.actionQuality));
+      lines.push(renderScoreLine("Pacing", r.judge.pacing));
+      lines.push(renderScoreLine("Visual polish", r.judge.visualPolish));
+      lines.push("");
+      lines.push("### Prompt-change proposals");
+      lines.push("");
+      if (r.judge.proposals.length === 0) {
+        lines.push("(none — judge found nothing to change)");
+      } else {
+        r.judge.proposals.forEach((p, idx) => {
+          lines.push(`${idx + 1}. **${p.promptFile}** — ${p.change}`);
+          lines.push(`   Why: ${p.why}`);
+        });
+      }
+      lines.push("");
     } else {
-      r.judge.proposals.forEach((p, idx) => {
-        lines.push(`${idx + 1}. **${p.promptFile}** — ${p.change}`);
-        lines.push(`   Why: ${p.why}`);
-      });
+      lines.push("Scores: judged by Claude from the artifacts below (docs/training/loop.md, step 3).");
+      lines.push("Append the verdict to docs/training/scoreboard.md.");
+      lines.push("");
     }
-    lines.push("");
+    if (r.local) {
+      lines.push("### Run facts (local mode)");
+      lines.push("");
+      lines.push(`- prompt versions: scout v${r.local.promptVersions.scout}, director v${r.local.promptVersions.director}`);
+      const c = r.local.cost;
+      lines.push(
+        `- cost: $${c.totalUsd.toFixed(4)} total — scout $${c.scout.usd.toFixed(4)} (${c.scout.inputTokens}/${c.scout.outputTokens} tok), ` +
+          `director $${c.director.usd.toFixed(4)} (${c.director.inputTokens}/${c.director.outputTokens} tok), ` +
+          `tts ~$${c.ttsUsd.toFixed(4)} (${c.ttsAudioSec}s audio). ${c.note}.`,
+      );
+      const p = r.local.phases;
+      lines.push(
+        `- phases: scout ${Math.round(p.scoutMs / 1000)}s, map ${Math.round(p.mapMs / 1000)}s, ` +
+          `director ${Math.round(p.directorMs / 1000)}s, record ${Math.round(p.recordMs / 1000)}s, total ${Math.round(p.totalMs / 1000)}s`,
+      );
+      lines.push("");
+    }
     lines.push("### Artifacts");
     lines.push("");
     lines.push(`- video: ${relative(logsRoot, r.mp4Path)}`);
     lines.push(`- frames: ${r.framePaths.length} (${relative(logsRoot, dirname(r.framePaths[0]))})`);
     lines.push(`- captions: ${r.vttPath ? relative(logsRoot, r.vttPath) : "(none)"}`);
+    if (r.local) {
+      lines.push(`- storyboard: ${r.local.storyboardPath ? relative(logsRoot, r.local.storyboardPath) : "(none)"}`);
+      lines.push(`- map screenshots: ${relative(logsRoot, r.local.mapShotsDir)}`);
+      lines.push(`- run meta (cost, timings, segments): ${relative(logsRoot, r.local.metaPath)}`);
+    }
     lines.push("");
   });
 
@@ -657,8 +805,12 @@ function writeReport(
 async function main(): Promise<void> {
   const argv = parseArgs(process.argv.slice(2));
   loadEnv();
-  if (!process.env.OPENAI_API_KEY) {
+  // Local mode calls OpenAI directly; remote mode only needs a key for --judge.
+  if ((argv.local || argv.judge) && !process.env.OPENAI_API_KEY) {
     throw new Error(`OPENAI_API_KEY is not set (expected in ${join(REPO_ROOT, ".env")} — see docs/setup/start.md)`);
+  }
+  if (argv.local && !process.env.TAVILY_API_KEY) {
+    throw new Error(`TAVILY_API_KEY is not set (expected in ${join(REPO_ROOT, ".env")} — Scout needs it in --local mode)`);
   }
 
   const fileLogger = createLogger("training", LOGS_ROOT);
@@ -670,15 +822,21 @@ async function main(): Promise<void> {
     : argv.signupDomain
       ? ` signup=${argv.signupDomain}`
       : "";
-  log.info(`training loop: site=${argv.site} base=${argv.base} runs=${argv.runs}${credentialsTag}`);
+  const mode = argv.local ? "local" : "remote";
+  log.info(
+    `training loop: site=${argv.site} mode=${mode}${argv.local ? "" : ` base=${argv.base}`} runs=${argv.runs}` +
+      `${credentialsTag}${argv.label ? ` label=${argv.label}` : ""}`,
+  );
 
-  const options = buildRunOptions(argv.signupDomain, argv.login, argv.format);
+  const options = buildRunOptions(argv.signupDomain, argv.login, argv.format, argv.length, argv.guidance);
   const results: IterationResult[] = [];
 
   for (let i = 1; i <= argv.runs; i++) {
     const tag = argv.runs > 1 ? `[${i}/${argv.runs}]` : "";
-    log.info(withTag(tag, `starting training run against ${argv.site}`));
-    const result = await trainOnce({ base: argv.base, site: argv.site, options, tag, runDir, log });
+    log.info(withTag(tag, `starting ${mode} training run against ${argv.site}`));
+    const result = argv.local
+      ? await localOnce({ site: argv.site, options, label: argv.label, tag, runDir, log })
+      : await trainOnce({ base: argv.base, site: argv.site, options, tag, runDir, log, judgeEnabled: argv.judge });
     results.push(result);
     if (result.kind === "failed") {
       log.error(withTag(tag, `FAILED: ${result.reason}`));
@@ -687,7 +845,12 @@ async function main(): Promise<void> {
     }
   }
 
-  const reportPath = writeReport({ site: argv.site, base: argv.base, runsRequested: argv.runs }, results, runDir, LOGS_ROOT);
+  const reportPath = writeReport(
+    { site: argv.site, mode, base: argv.base, runsRequested: argv.runs, label: argv.label },
+    results,
+    runDir,
+    LOGS_ROOT,
+  );
   console.log(`report: ${reportPath}`);
 
   process.exitCode = results.some((r) => r.kind === "failed") ? 1 : 0;

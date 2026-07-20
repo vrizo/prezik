@@ -80,6 +80,14 @@ const sceneValidator = v.object({
   actions: v.array(sceneActionValidator),
 });
 
+// A scene as it appears while the Director is still streaming: enough to draw
+// a scene card in the live Plan view before the full storyboard exists.
+export const planProgressSceneValidator = v.object({
+  title: v.string(),
+  narration: v.string(),
+  actionCount: v.number(),
+});
+
 export const storyboardValidator = v.object({
   targetUrl: v.string(),
   productName: v.string(),

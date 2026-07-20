@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Logo } from "../../components/Logo";
 import { Modal } from "../../components/ui/Modal";
-import { PhaseStepper } from "../../components/ui/PhaseStepper";
+import { PhaseStepper, type Phase } from "../../components/ui/PhaseStepper";
 import { getOrCreateAnonId } from "../../lib/anon";
 import { errorMessage } from "../../lib/errors";
 import { runPath } from "../../lib/paths";
@@ -56,6 +56,24 @@ function loadStoredOptions(): PersonalisationOptions {
 type Session = { sessionId: Id<"sessions">; credits: number; couponCode?: string };
 type Props = { navigate: (path: string, opts?: { freshRun?: boolean }) => void };
 
+// Review mode for a finished run: the same form, seeded from the run and fully
+// read-only, with the phase stepper driving navigation instead of a start
+// button. Set only by RunScreen; the live "/" and "/new" screens never pass it.
+export type LinkReadOnly = {
+  options: PersonalisationOptions;
+  credentials: RunOptions["credentials"];
+  guidance: string;
+  onSelectPhase: (phase: Phase) => void;
+};
+
+function credentialsToDraft(credentials: RunOptions["credentials"]): CredentialsDraft {
+  if (credentials.mode === "login")
+    return { mode: "login", email: credentials.email, password: credentials.password };
+  if (credentials.mode === "signup")
+    return { mode: "signup", emailDomain: credentials.emailDomain };
+  return EMPTY_LOGIN_DRAFT;
+}
+
 export function LinkStepScreen({ navigate }: Props) {
   const url = new URLSearchParams(window.location.search).get("url") ?? "";
 
@@ -82,17 +100,25 @@ function MinimalCard({ navigate }: Props) {
   );
 }
 
-function LinkStepForm({ url, navigate }: { url: string } & Props) {
+export function LinkStepForm({
+  url,
+  navigate,
+  readOnly,
+}: { url: string; readOnly?: LinkReadOnly } & Props) {
   const [anonId] = useState(getOrCreateAnonId);
   const [session, setSession] = useState<Session | null>(null);
-  const [personalisation, setPersonalisation] = useState<PersonalisationOptions>(loadStoredOptions);
+  const [personalisation, setPersonalisation] = useState<PersonalisationOptions>(
+    () => readOnly?.options ?? loadStoredOptions(),
+  );
 
   function updatePersonalisation(next: PersonalisationOptions) {
     setPersonalisation(next);
     localStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(next));
   }
   const [storedCreds] = useState(loadStoredCreds);
-  const [credDraft, setCredDraft] = useState<CredentialsDraft>(storedCreds.draft ?? EMPTY_LOGIN_DRAFT);
+  const [credDraft, setCredDraft] = useState<CredentialsDraft>(
+    () => (readOnly ? credentialsToDraft(readOnly.credentials) : storedCreds.draft ?? EMPTY_LOGIN_DRAFT),
+  );
   const [storeCreds, setStoreCreds] = useState(storedCreds.store);
 
   function persistCreds(store: boolean, draft: CredentialsDraft) {
@@ -112,7 +138,7 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
     persistCreds(store, credDraft);
   }
   const [instructions, setInstructions] = useState(
-    () => localStorage.getItem(INSTRUCTIONS_STORAGE_KEY) ?? "",
+    () => readOnly?.guidance ?? localStorage.getItem(INSTRUCTIONS_STORAGE_KEY) ?? "",
   );
 
   function updateInstructions(next: string) {
@@ -132,8 +158,10 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
   const createRun = useMutation(api.runs.create);
 
   // One-time bootstrap of the anonymous session — a write, not a data
-  // fetch, so this is the right tool.
+  // fetch, so this is the right tool. Skipped in review mode: there's nothing
+  // to start, so no session is needed.
   useEffect(() => {
+    if (readOnly) return;
     getOrCreateSession({ anonId }).then(setSession);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -230,21 +258,23 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
               <path d="M8 11V8a4 4 0 0 1 8 0v3" />
             </svg>
             <span className="text-[13px] font-semibold">{hostname}</span>
-            <button
-              type="button"
-              onClick={() => navigate(`/?url=${encodeURIComponent(url)}`)}
-              className="text-xs text-faint hover:text-ink"
-            >
-              edit
-            </button>
+            {!readOnly && (
+              <button
+                type="button"
+                onClick={() => navigate(`/?url=${encodeURIComponent(url)}`)}
+                className="text-xs text-faint hover:text-ink"
+              >
+                edit
+              </button>
+            )}
           </div>
         </div>
 
         <div className="px-6 pb-[34px] pt-[30px] sm:px-10">
-          <PhaseStepper phase="link" className="mb-[26px]" />
+          <PhaseStepper phase="link" className="mb-[26px]" onSelect={readOnly?.onSelectPhase} />
 
           <div className="mx-auto flex max-w-[620px] flex-col gap-5">
-            <OptionsFields options={personalisation} onChange={updatePersonalisation} />
+            <OptionsFields options={personalisation} onChange={updatePersonalisation} disabled={!!readOnly} />
             <CredentialsFields
               ref={emailRef}
               draft={credDraft}
@@ -252,38 +282,43 @@ function LinkStepForm({ url, navigate }: { url: string } & Props) {
               error={credError}
               store={storeCreds}
               onStoreChange={updateStoreCreds}
+              disabled={!!readOnly}
             />
-            <InstructionsField value={instructions} onChange={updateInstructions} />
+            <InstructionsField value={instructions} onChange={updateInstructions} disabled={!!readOnly} />
 
-            {submitError && <p className="text-center text-sm text-red-600">{submitError}</p>}
+            {!readOnly && (
+              <>
+                {submitError && <p className="text-center text-sm text-red-600">{submitError}</p>}
 
-            <div className="mt-1.5 flex flex-col items-center gap-2.5">
-              <button
-                type="button"
-                onClick={handleStartClick}
-                disabled={disabled}
-                className="inline-flex h-[52px] items-center gap-2 rounded-full bg-ink px-[30px] text-base font-semibold text-white hover:bg-[#44403a] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {submitting ? "Starting…" : hasCredentials ? "Start creating" : "Start creating without test credentials"}
-                <svg
-                  width="17"
-                  height="17"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={2.6}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h14m-6-6 6 6-6 6" />
-                </svg>
-              </button>
+                <div className="mt-1.5 flex flex-col items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleStartClick}
+                    disabled={disabled}
+                    className="inline-flex h-[52px] items-center gap-2 rounded-full bg-ink px-[30px] text-base font-semibold text-white hover:bg-[#44403a] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {submitting ? "Starting…" : hasCredentials ? "Start creating" : "Start creating without test credentials"}
+                    <svg
+                      width="17"
+                      height="17"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.6}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14m-6-6 6 6-6 6" />
+                    </svg>
+                  </button>
 
-              <span className="text-xs text-faint">
-                Prezik starts exploring the&nbsp;moment you begin — pay per&nbsp;run
-              </span>
-            </div>
+                  <span className="text-xs text-faint">
+                    Prezik starts exploring the&nbsp;moment you begin — pay per&nbsp;run
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

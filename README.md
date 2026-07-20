@@ -40,8 +40,6 @@ cd .. && npm install
 cd app && npx convex login
 ```
 
-
-
 ## Start
 
 There is no full local product environment — the backend runs on the linked Convex deployment (staging = dev: `polished-chicken-876`, EU).

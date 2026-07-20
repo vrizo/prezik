@@ -4,17 +4,19 @@ type Props = {
   onChange: (checked: boolean) => void;
   label?: string;
   "aria-label"?: string;
+  disabled?: boolean;
 };
 
-export function Toggle({ checked, onChange, label, "aria-label": ariaLabel }: Props) {
+export function Toggle({ checked, onChange, label, "aria-label": ariaLabel, disabled = false }: Props) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
       aria-label={label ?? ariaLabel}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative h-[27px] w-[46px] flex-none rounded-full transition-colors ${
+      className={`relative h-[27px] w-[46px] flex-none rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
         checked ? "bg-ink" : "bg-chip"
       }`}
     >

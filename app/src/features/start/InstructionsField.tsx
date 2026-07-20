@@ -46,13 +46,14 @@ function useTypingPlaceholder(active: boolean): string {
 type Props = {
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 };
 
 // The "Custom instructions" card: free-form guidance for the agents. The
 // backend stores it as options.guidance.
-export function InstructionsField({ value, onChange }: Props) {
+export function InstructionsField({ value, onChange, disabled = false }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const placeholder = useTypingPlaceholder(value === "");
+  const placeholder = useTypingPlaceholder(!disabled && value === "");
 
   // Grow with the content (3 lines by default, expands while typing).
   function autosize() {
@@ -81,13 +82,16 @@ export function InstructionsField({ value, onChange }: Props) {
         onChange={(e) => onChange(e.target.value.slice(0, INSTRUCTIONS_MAX))}
         rows={3}
         maxLength={INSTRUCTIONS_MAX}
-        placeholder={placeholder}
+        placeholder={disabled ? undefined : placeholder}
+        disabled={disabled}
         aria-label="Custom instructions"
-        className="block w-full resize-none overflow-hidden rounded-[14px] border border-line2 bg-white px-4 py-3 text-sm leading-[1.55] text-ink outline-none placeholder:text-faint focus:border-ink"
+        className="block w-full resize-none overflow-hidden rounded-[14px] border border-line2 bg-white px-4 py-3 text-sm leading-[1.55] text-ink outline-none placeholder:text-faint focus:border-ink disabled:cursor-not-allowed disabled:opacity-70"
       />
-      <div className="mt-1.5 text-right text-[11px] text-faint">
-        {value.length}/{INSTRUCTIONS_MAX}
-      </div>
+      {!disabled && (
+        <div className="mt-1.5 text-right text-[11px] text-faint">
+          {value.length}/{INSTRUCTIONS_MAX}
+        </div>
+      )}
     </div>
   );
 }

@@ -17,57 +17,89 @@ const CHECK_PATH = "M20 6 9 17l-5-5";
 type Props = {
   phase: Phase;
   className?: string;
+  // Review mode (a finished run): every phase is reachable, so pass a handler
+  // and each step renders as a clickable button. `phase` is still the one
+  // highlighted as current.
+  onSelect?: (phase: Phase) => void;
 };
 
-export function PhaseStepper({ phase, className = "" }: Props) {
+export function PhaseStepper({ phase, className = "", onSelect }: Props) {
   const currentIndex = PHASES.findIndex((p) => p.key === phase);
+  const review = onSelect != null;
 
   return (
     <div className={`flex items-center justify-center gap-[10px] ${className}`}>
       {PHASES.map((step, index) => {
-        const state: StepState =
-          index < currentIndex ? "completed" : index === currentIndex ? "current" : "upcoming";
+        // Review mode: everything is done, so non-current steps read as
+        // completed but stay clickable; otherwise the linear before/at/after.
+        const state: StepState = review
+          ? index === currentIndex
+            ? "current"
+            : "completed"
+          : index < currentIndex
+            ? "completed"
+            : index === currentIndex
+              ? "current"
+              : "upcoming";
+
+        const dot = (
+          <span
+            className={`grid h-[22px] w-[22px] flex-none place-items-center rounded-full text-[12px] font-bold ${
+              state === "upcoming" ? "border-[1.5px] border-line2" : "bg-ink text-white"
+            }`}
+          >
+            {state === "completed" ? (
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d={CHECK_PATH} />
+              </svg>
+            ) : (
+              index + 1
+            )}
+          </span>
+        );
+        const label = (
+          <span
+            className={`text-[13px] ${
+              state === "current" ? "font-bold" : state === "completed" ? "font-semibold" : ""
+            }`}
+          >
+            {step.label}
+          </span>
+        );
+        const tone =
+          state === "completed" ? "text-sub" : state === "upcoming" ? "text-faint" : "text-ink";
 
         return (
           <Fragment key={step.key}>
-            <div
-              className={`flex items-center gap-2 ${
-                state === "completed" ? "text-sub" : state === "upcoming" ? "text-faint" : "text-ink"
-              }`}
-            >
-              <span
-                className={`grid h-[22px] w-[22px] flex-none place-items-center rounded-full text-[12px] font-bold ${
-                  state === "upcoming" ? "border-[1.5px] border-line2" : "bg-ink text-white"
-                }`}
+            {review ? (
+              <button
+                type="button"
+                onClick={() => onSelect(step.key)}
+                className={`flex items-center gap-2 ${tone}`}
               >
-                {state === "completed" ? (
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={3}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d={CHECK_PATH} />
-                  </svg>
-                ) : (
-                  index + 1
-                )}
-              </span>
-              <span
-                className={`text-[13px] ${
-                  state === "current" ? "font-bold" : state === "completed" ? "font-semibold" : ""
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
+                {dot}
+                {label}
+              </button>
+            ) : (
+              <div className={`flex items-center gap-2 ${tone}`}>
+                {dot}
+                {label}
+              </div>
+            )}
             {index < PHASES.length - 1 && (
-              <span className={`h-[1.5px] w-10 ${index < currentIndex ? "bg-ink" : "bg-line2"}`} />
+              <span
+                className={`h-[1.5px] w-10 ${review || index < currentIndex ? "bg-ink" : "bg-line2"}`}
+              />
             )}
           </Fragment>
         );

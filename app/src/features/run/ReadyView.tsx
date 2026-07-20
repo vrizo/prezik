@@ -1,12 +1,15 @@
 import { useState } from "react";
 import type { RunDoc } from "./RunScreen";
-import { PhaseStepper } from "../../components/ui/PhaseStepper";
+import { PhaseStepper, type Phase } from "../../components/ui/PhaseStepper";
 import { Confetti } from "../../components/ui/Confetti";
 import { TopUpPanel } from "./TopUpPanel";
 
 type Props = {
   run: RunDoc;
   onRerecord: () => void;
+  // Set for a finished run so the phase stepper can jump back to review the
+  // Link and Creating phases.
+  onSelectPhase?: (phase: Phase) => void;
 };
 
 function hostname(url: string): string {
@@ -27,7 +30,7 @@ function formatMeta(durationSec: number | undefined): string | null {
   return `${duration} — narrated`;
 }
 
-export function ReadyView({ run, onRerecord }: Props) {
+export function ReadyView({ run, onRerecord, onSelectPhase }: Props) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopyLink() {
@@ -43,7 +46,7 @@ export function ReadyView({ run, onRerecord }: Props) {
       <Confetti />
 
       <div className="relative w-full max-w-[1050px] rounded-[30px] border border-line bg-bg px-10 py-9">
-        <PhaseStepper phase="ready" className="relative z-10 mb-[30px]" />
+        <PhaseStepper phase="ready" className="relative z-10 mb-[30px]" onSelect={onSelectPhase} />
 
         <h2 className="relative z-10 m-0 mb-5 text-[36px] font-bold tracking-[-0.035em]">
           Your demo is ready

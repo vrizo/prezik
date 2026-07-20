@@ -25,6 +25,10 @@ tech-europe-hackathon
 vitalii.rizo+test1806@gmail.com
 eCZ-UWb-Lrp
 ---
+public examples recently generated when we're ready
+---
+music on the background
+---
 
 Custom instructions:
 

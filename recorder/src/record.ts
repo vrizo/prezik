@@ -42,6 +42,17 @@ export interface RecordResult {
   mp4Path: string;
   durationSec: number;
   captionsVtt?: string;
+  // Where each segment landed in the final video (after silence compression).
+  // startMs is the narration start offset, durationMs the narration audio
+  // length. Used by the training loop to sample frames near the actions.
+  segments: SegmentTiming[];
+}
+
+export interface SegmentTiming {
+  kind: "intro" | "scene" | "outro" | "endcard";
+  id: string;
+  startMs: number;
+  durationMs: number;
 }
 
 // Fixed hold for the closing logo card, in ms.
@@ -424,13 +435,20 @@ export async function runRecording(job: RecordJob): Promise<RecordResult> {
   await assembleAndMux(concatPath, placements, mp4Path, job.log, srtPath, outputSize);
   const durationSec = Math.round((await probeDurationMs(mp4Path)) / 1000);
 
+  const segmentTimings: SegmentTiming[] = segments.map((s, i) => ({
+    kind: s.kind,
+    id: s.id,
+    startMs: offsetOf(s, i),
+    durationMs: s.audioMs,
+  }));
+
   // Frames and narration clips are only inputs to the finished mp4. Delete them
   // so a long-lived container instance does not accumulate ~100MB per run.
   rmSync(framesDir, { recursive: true, force: true });
   for (const s of segments) if (s.audioPath) rmSync(s.audioPath, { force: true });
   job.log.info(`cleaned ${frames.files.length} frame files + ${placements.length} audio clip(s)`);
 
-  return { mp4Path, durationSec, captionsVtt };
+  return { mp4Path, durationSec, captionsVtt, segments: segmentTimings };
 }
 
 // Visual "beat" actions whose timing is spread across the narration.

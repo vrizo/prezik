@@ -29,9 +29,10 @@ const VOICE_ORBS: Record<PersonalisationOptions["voice"], OrbTheme> = {
 type Props = {
   options: PersonalisationOptions;
   onChange: (options: PersonalisationOptions) => void;
+  disabled?: boolean;
 };
 
-export function OptionsFields({ options, onChange }: Props) {
+export function OptionsFields({ options, onChange, disabled = false }: Props) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const voiceRef = useRef<HTMLDivElement>(null);
 
@@ -66,8 +67,9 @@ export function OptionsFields({ options, onChange }: Props) {
             aria-label="Voice"
             aria-haspopup="listbox"
             aria-expanded={voiceOpen}
+            disabled={disabled}
             onClick={() => setVoiceOpen((v) => !v)}
-            className="flex h-11 w-full items-center justify-between gap-2.5 rounded-full border border-line2 bg-white py-0 pl-3 pr-2"
+            className="flex h-11 w-full items-center justify-between gap-2.5 rounded-full border border-line2 bg-white py-0 pl-3 pr-2 disabled:cursor-not-allowed disabled:opacity-70"
           >
             <span className="flex items-center gap-2.5">
               <Orb theme={VOICE_ORBS[options.voice]} className="h-[22px] w-[22px] flex-none" />
@@ -119,7 +121,7 @@ export function OptionsFields({ options, onChange }: Props) {
 
       {/* Enable zooming */}
       <Row label="Enable zooming">
-        <Toggle checked={options.zoom} onChange={(zoom) => onChange({ ...options, zoom })} label="Enable zooming" />
+        <Toggle checked={options.zoom} onChange={(zoom) => onChange({ ...options, zoom })} label="Enable zooming" disabled={disabled} />
       </Row>
 
       {/* Length */}
@@ -131,9 +133,10 @@ export function OptionsFields({ options, onChange }: Props) {
             max={LENGTHS.length - 1}
             step={1}
             value={lengthIndex}
+            disabled={disabled}
             onChange={(e) => onChange({ ...options, length: LENGTHS[Number(e.target.value)] })}
             aria-label="Demo length"
-            className="peer absolute inset-x-0 -top-2 h-6 w-full cursor-pointer opacity-0"
+            className="peer absolute inset-x-0 -top-2 h-6 w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
           />
           <div className="pointer-events-none relative h-1.5 rounded-full bg-chip">
             <span
@@ -157,7 +160,7 @@ export function OptionsFields({ options, onChange }: Props) {
 
       {/* Captions */}
       <Row label="Captions">
-        <Toggle checked={options.captions} onChange={(captions) => onChange({ ...options, captions })} label="Captions" />
+        <Toggle checked={options.captions} onChange={(captions) => onChange({ ...options, captions })} label="Captions" disabled={disabled} />
       </Row>
 
       {/* Format */}
@@ -168,12 +171,14 @@ export function OptionsFields({ options, onChange }: Props) {
             onClick={() => onChange({ ...options, format: "horizontal" })}
             label="Horizontal 16:9"
             rect={{ x: 3, y: 6, width: 18, height: 12 }}
+            disabled={disabled}
           />
           <FormatButton
             active={options.format === "vertical"}
             onClick={() => onChange({ ...options, format: "vertical" })}
             label="Vertical 9:16"
             rect={{ x: 6, y: 3, width: 12, height: 18 }}
+            disabled={disabled}
           />
         </div>
       </Row>
@@ -186,18 +191,21 @@ function FormatButton({
   onClick,
   label,
   rect,
+  disabled = false,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   rect: { x: number; y: number; width: number; height: number };
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-pressed={active}
+      disabled={disabled}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full px-[15px] py-2 text-[13px] font-semibold ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-[15px] py-2 text-[13px] font-semibold disabled:cursor-not-allowed disabled:opacity-70 ${
         active ? "bg-ink text-white" : "border border-line text-sub hover:bg-chip"
       }`}
     >
